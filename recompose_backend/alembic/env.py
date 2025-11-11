@@ -13,8 +13,17 @@ from alembic import context
 
 # --- Import Application Models ---
 from app.db import Base
-from app.models.user import User
-from app.models.rewrite import RewriteLog
+# Import all models so Alembic can detect them
+from app.models import (
+    User,
+    RewriteLog,
+    Contact,
+    Campaign,
+    CampaignEmail,
+    CampaignRecipient,
+    EmailEvent,
+    EmailAccount,
+)
 from app.config import settings
 
 # --- Alembic Config Object ---

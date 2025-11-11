@@ -5,7 +5,7 @@ Authentication endpoints for user signup and login.
 
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, EmailStr, Field, field_validator, field_serializer, ConfigDict
@@ -163,7 +163,7 @@ async def signup(request: Request, user_data: UserSignup, db: AsyncSession = Dep
 @router.post("/login", response_model=TokenResponse)
 async def login(
     request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    login_data: UserLogin,
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -171,7 +171,7 @@ async def login(
     
     Args:
         request: FastAPI request object (for rate limiting)
-        form_data: OAuth2 password form data (username=email, password)
+        login_data: User login data (email and password)
         db: Database session
         
     Returns:
@@ -181,11 +181,11 @@ async def login(
         HTTPException: If credentials are invalid
     """
     # Rate limiting is handled by middleware if enabled
-    # --- Find user by email (OAuth2 uses 'username' field for email) ---
-    result = await db.execute(select(User).where(User.email == form_data.username))
+    # --- Find user by email ---
+    result = await db.execute(select(User).where(User.email == login_data.email))
     user = result.scalar_one_or_none()
     
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",

@@ -3,7 +3,7 @@
 API routers package.
 """
 
-from app.routers import auth, rewrite, billing
+from app.routers import auth, rewrite, billing, contacts, campaigns, generate, tracking
 
-__all__ = ["auth", "rewrite", "billing"]
+__all__ = ["auth", "rewrite", "billing", "contacts", "campaigns", "generate", "tracking"]
 

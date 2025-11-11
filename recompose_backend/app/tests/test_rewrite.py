@@ -25,11 +25,11 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
         }
     )
     
-    # Login to get token
+    # Login to get token (using JSON body)
     login_response = await client.post(
         "/auth/login",
-        data={
-            "username": "test@example.com",
+        json={
+            "email": "test@example.com",
             "password": "testpassword123"
         }
     )
@@ -376,8 +376,8 @@ async def test_get_logs_user_isolation(
     )
     user1_login = await client.post(
         "/auth/login",
-        data={
-            "username": "user1@example.com",
+        json={
+            "email": "user1@example.com",
             "password": "password123"
         }
     )
@@ -405,8 +405,8 @@ async def test_get_logs_user_isolation(
     )
     user2_login = await client.post(
         "/auth/login",
-        data={
-            "username": "user2@example.com",
+        json={
+            "email": "user2@example.com",
             "password": "password123"
         }
     )

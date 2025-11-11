@@ -3,7 +3,7 @@
 Email rewrite endpoint using OpenAI GPT-4o.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc, func
@@ -19,7 +19,7 @@ from app.config import settings
 import logging
 
 # --- Router Setup ---
-router = APIRouter(prefix="/rewrite", tags=["rewrite"])
+router = APIRouter(prefix="/api/rewrite", tags=["rewrite"])
 
 # --- Logger ---
 logger = logging.getLogger(__name__)
@@ -97,6 +97,88 @@ class RewriteLogsListResponse(BaseModel):
     offset: int
 
 
+class UsageResponse(BaseModel):
+    """Usage statistics response model."""
+    used: int
+    limit: int
+    remaining: int
+    plan: str
+
+
+# --- Helper Functions ---
+async def get_daily_limit_for_user(user: User) -> int:
+    """Get daily rewrite limit for a user based on their subscription plan."""
+    if user.subscription_plan == "standard":
+        return settings.STANDARD_PLAN_DAILY_LIMIT
+    elif user.subscription_plan == "pro":
+        return settings.PRO_PLAN_DAILY_LIMIT
+    else:
+        # Default to standard plan limit for unknown plans
+        return settings.STANDARD_PLAN_DAILY_LIMIT
+
+
+async def check_minute_usage_limit(user: User, db: AsyncSession) -> tuple[int, int]:
+    """
+    Check per-minute usage limit for a user (throttling).
+    
+    Args:
+        user: User object
+        db: Database session
+        
+    Returns:
+        Tuple of (used_count_in_minute, limit_per_minute)
+    """
+    # Get per-minute limit (same for all plans, configurable)
+    minute_limit = settings.REWRITE_RATE_LIMIT_PER_MINUTE
+    
+    # Calculate start of current minute
+    now = datetime.now(timezone.utc)
+    start_of_minute = now.replace(second=0, microsecond=0)
+    
+    # Count rewrites in the last minute
+    count_result = await db.execute(
+        select(func.count(RewriteLog.id))
+        .where(RewriteLog.user_id == user.id)
+        .where(RewriteLog.created_at >= start_of_minute)
+    )
+    used_count = count_result.scalar() or 0
+    
+    return used_count, minute_limit
+
+
+async def check_daily_usage_limit(user: User, db: AsyncSession) -> tuple[int, int]:
+    """
+    Check daily usage limit for a user.
+    Limits reset daily at UTC midnight.
+    
+    Args:
+        user: User object
+        db: Database session
+        
+    Returns:
+        Tuple of (used_count, limit)
+        
+    Raises:
+        HTTPException: If limit exceeded
+    """
+    # Get daily limit based on user's plan
+    daily_limit = await get_daily_limit_for_user(user)
+    
+    # Calculate start of current UTC day (midnight UTC)
+    now = datetime.now(timezone.utc)
+    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Count rewrites since start of current UTC day
+    count_result = await db.execute(
+        select(func.count(RewriteLog.id))
+        .where(RewriteLog.user_id == user.id)
+        .where(RewriteLog.created_at >= start_of_day)
+    )
+    used_count = count_result.scalar() or 0
+    
+    return used_count, daily_limit
+
+
 # --- Rewrite Endpoint ---
 @router.post("", response_model=RewriteResponse)
 async def rewrite_email(
@@ -121,6 +203,23 @@ async def rewrite_email(
         HTTPException: If OpenAI API fails or tone is invalid
     """
     # Validation is handled by Pydantic validators above
+    
+    # --- Check per-minute throttling limit ---
+    used_in_minute, minute_limit = await check_minute_usage_limit(current_user, db)
+    if used_in_minute >= minute_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded. Maximum {minute_limit} rewrites per minute. Please slow down."
+        )
+    
+    # --- Check daily usage limit ---
+    used_count, daily_limit = await check_daily_usage_limit(current_user, db)
+    if used_count >= daily_limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Daily rewrite limit reached. You have used {used_count} of {daily_limit} rewrites today. "
+                   f"Upgrade to Pro plan for higher limits."
+        )
     
     # --- Validate OpenAI API key is set ---
     if not settings.OPENAI_API_KEY:
@@ -178,6 +277,15 @@ Email:
         
         # --- Count words in rewritten email ---
         word_count = count_words(rewritten_email)
+        
+        # --- Re-check usage limit right before committing (prevents race condition) ---
+        used_count, daily_limit = await check_daily_usage_limit(current_user, db)
+        if used_count >= daily_limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Daily rewrite limit reached. You have used {used_count} of {daily_limit} rewrites today. "
+                       f"Upgrade to Pro plan for higher limits."
+            )
         
         # --- Log rewrite to database ---
         rewrite_log = RewriteLog(
@@ -261,5 +369,39 @@ async def get_rewrite_logs(
         "total": total,
         "limit": limit,
         "offset": offset
+    }
+
+
+# --- Get Usage Statistics Endpoint ---
+@router.get("/usage", response_model=UsageResponse)
+async def get_usage(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get daily usage statistics for the current user.
+    
+    Args:
+        request: FastAPI request object (for request ID logging)
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Usage statistics with used count, limit, remaining, and plan
+    """
+    used_count, daily_limit = await check_daily_usage_limit(current_user, db)
+    remaining = max(0, daily_limit - used_count)
+    
+    logger.info(
+        f"User {current_user.id} checked usage: {used_count}/{daily_limit} ({remaining} remaining)",
+        extra={"request_id": getattr(request.state, "request_id", "unknown")}
+    )
+    
+    return {
+        "used": used_count,
+        "limit": daily_limit,
+        "remaining": remaining,
+        "plan": current_user.subscription_plan
     }
 

@@ -17,6 +17,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.routers import auth, rewrite, billing
+from app.routers import contacts, campaigns, generate, tracking
 
 
 # --- Structured JSON Log Formatter ---
@@ -217,6 +218,10 @@ async def health_check():
 app.include_router(auth.router)
 app.include_router(rewrite.router)
 app.include_router(billing.router)  # Always included, but returns 503 when BILLING_ENABLED=false
+app.include_router(contacts.router)
+app.include_router(campaigns.router)
+app.include_router(generate.router)
+app.include_router(tracking.router)
 
 
 # --- Root Endpoint ---

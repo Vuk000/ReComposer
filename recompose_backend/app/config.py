@@ -146,6 +146,116 @@ class Settings(BaseSettings):
         description="Enable billing endpoints (set to true to enable)"
     )
     
+    # --- Stripe Configuration ---
+    STRIPE_SECRET_KEY: str = Field(
+        default="",
+        description="Stripe secret key (required when billing enabled)"
+    )
+    STRIPE_WEBHOOK_SECRET: str = Field(
+        default="",
+        description="Stripe webhook secret for verifying webhook signatures"
+    )
+    
+    # --- Usage Limits Configuration ---
+    STANDARD_PLAN_DAILY_LIMIT: int = Field(
+        default=20,
+        ge=1,
+        description="Daily rewrite limit for standard plan users"
+    )
+    PRO_PLAN_DAILY_LIMIT: int = Field(
+        default=1000,
+        ge=1,
+        description="Daily rewrite limit for pro plan users (effectively unlimited)"
+    )
+    REWRITE_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=20,
+        ge=1,
+        description="Maximum rewrites per minute per user (throttling)"
+    )
+    
+    # --- Email Provider Configuration ---
+    GMAIL_CLIENT_ID: str = Field(
+        default="",
+        description="Gmail OAuth client ID (for future OAuth integration)"
+    )
+    GMAIL_CLIENT_SECRET: str = Field(
+        default="",
+        description="Gmail OAuth client secret (for future OAuth integration)"
+    )
+    OUTLOOK_CLIENT_ID: str = Field(
+        default="",
+        description="Outlook OAuth client ID (for future OAuth integration)"
+    )
+    OUTLOOK_CLIENT_SECRET: str = Field(
+        default="",
+        description="Outlook OAuth client secret (for future OAuth integration)"
+    )
+    SMTP_DEFAULT_PORT: int = Field(
+        default=587,
+        ge=1,
+        le=65535,
+        description="Default SMTP port"
+    )
+    SMTP_DEFAULT_USE_TLS: bool = Field(
+        default=True,
+        description="Default SMTP TLS setting"
+    )
+    
+    # --- Campaign Configuration ---
+    MAX_EMAILS_PER_MINUTE: int = Field(
+        default=50,
+        ge=1,
+        description="Maximum emails to send per minute (rate limiting)"
+    )
+    REPLY_CHECK_INTERVAL_MINUTES: int = Field(
+        default=5,
+        ge=1,
+        description="Interval in minutes to check for email replies"
+    )
+    CAMPAIGN_RATE_LIMIT_PER_MINUTE: int = Field(
+        default=5,
+        ge=1,
+        description="Maximum campaign launches per minute per user"
+    )
+    TRACKING_BASE_URL: str = Field(
+        default="http://localhost:8000",
+        description="Base URL for tracking pixels (e.g., https://api.yourdomain.com)"
+    )
+    
+    # --- Celery Configuration ---
+    CELERY_BROKER_URL: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis broker URL for Celery"
+    )
+    CELERY_RESULT_BACKEND: str = Field(
+        default="redis://localhost:6379/0",
+        description="Redis result backend URL for Celery"
+    )
+    
+    # --- Encryption Configuration ---
+    ENCRYPTION_KEY: str = Field(
+        default="",
+        description="Encryption key for OAuth tokens (base64-encoded Fernet key)"
+    )
+    
+    # --- Subscription Pricing ---
+    STANDARD_PLAN_PRICE: int = Field(
+        default=1499,
+        description="Standard plan price in cents ($14.99)"
+    )
+    PRO_PLAN_PRICE: int = Field(
+        default=4999,
+        description="Pro plan price in cents ($49.99)"
+    )
+    STRIPE_PRO_PRICE_ID: str = Field(
+        default="",
+        description="Stripe price ID for Pro plan"
+    )
+    STRIPE_STANDARD_PRICE_ID: str = Field(
+        default="",
+        description="Stripe price ID for Standard plan"
+    )
+    
     @field_validator("OPENAI_API_KEY")
     @classmethod
     def validate_openai_api_key(cls, v: str) -> str:

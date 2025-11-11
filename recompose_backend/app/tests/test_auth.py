@@ -85,8 +85,8 @@ async def test_login_success(client: AsyncClient, db_session: AsyncSession):
     # Login
     response = await client.post(
         "/auth/login",
-        data={
-            "username": "test@example.com",  # OAuth2 uses 'username' for email
+        json={
+            "email": "test@example.com",
             "password": "testpassword123"
         }
     )
@@ -118,8 +118,8 @@ async def test_login_invalid_credentials(client: AsyncClient, db_session: AsyncS
     # Try login with wrong password
     response = await client.post(
         "/auth/login",
-        data={
-            "username": "test@example.com",
+        json={
+            "email": "test@example.com",
             "password": "wrongpassword"
         }
     )
@@ -133,8 +133,8 @@ async def test_login_nonexistent_user(client: AsyncClient, db_session: AsyncSess
     """Test login with non-existent user fails."""
     response = await client.post(
         "/auth/login",
-        data={
-            "username": "nonexistent@example.com",
+        json={
+            "email": "nonexistent@example.com",
             "password": "somepassword"
         }
     )
@@ -157,8 +157,8 @@ async def test_get_current_user(client: AsyncClient, db_session: AsyncSession):
     
     login_response = await client.post(
         "/auth/login",
-        data={
-            "username": "test@example.com",
+        json={
+            "email": "test@example.com",
             "password": "testpassword123"
         }
     )
