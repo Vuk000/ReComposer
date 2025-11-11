@@ -58,7 +58,7 @@ async def test_get_subscription_status_free_user(
     
     assert response.status_code == 200
     data = response.json()
-    assert data["plan"] == "free"
+    assert data["plan"] == "standard"  # New users default to "standard" plan
     assert data["status"] == "active"
     assert data["customer_id"] is None
     assert data["subscription_id"] is None
@@ -364,9 +364,9 @@ async def test_webhook_subscription_deleted(
     
     assert response.status_code == 200
     
-    # Verify user was downgraded to free
+    # Verify user was downgraded to standard
     await db_session.refresh(user)
-    assert user.subscription_plan == "free"
+    assert user.subscription_plan == "standard"  # Downgraded to standard after cancellation
     assert user.subscription_status == "cancelled"
 
 

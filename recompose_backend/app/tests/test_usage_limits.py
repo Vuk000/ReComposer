@@ -107,7 +107,7 @@ async def test_get_usage_free_user(
     assert "limit" in data
     assert "remaining" in data
     assert "plan" in data
-    assert data["plan"] == "free"
+    assert data["plan"] == "standard"  # New users default to "standard" plan
     assert data["limit"] == 20
     assert data["used"] == 0
     assert data["remaining"] == 20

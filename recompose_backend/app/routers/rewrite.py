@@ -404,4 +404,3 @@ async def get_usage(
         "remaining": remaining,
         "plan": current_user.subscription_plan
     }
-
