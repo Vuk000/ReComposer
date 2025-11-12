@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up – ReComposer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="signup-container">
+    <div class="signup-header">
+      <h1>Get Started with ReComposer</h1>
+      <p>Sign up in seconds and start improving your emails immediately.</p>
+    </div>
+    <form class="signup-form" id="signupForm">
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" placeholder="you@example.com" required>
+      
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Create a password" required>
+      
+      <div id="planInfo" style="margin-top: 1rem; padding: 0.75rem; background: #f0f7ff; border-radius: 0.3rem; display: none;">
+        <strong>Selected Plan:</strong> <span id="planName"></span>
+      </div>
+
+      <button type="submit" id="submitBtn">Create Account</button>
+    </form>
+    <div class="small-note">By signing up, you agree to our <a href="#">Terms of Service</a>.</div>
+    <div class="alt-option">
+      Already have an account? <a href="login.html">Log in</a>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    // Get plan from URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const plan = urlParams.get('plan');
+    const planInfo = document.getElementById('planInfo');
+    const planName = document.getElementById('planName');
+
+    if (plan === 'standard' || plan === 'pro') {
+      planInfo.style.display = 'block';
+      planName.textContent = plan === 'standard' ? 'Standard ($14.99/mo)' : 'Pro ($49.99/mo)';
+    }
+
+    // Form submission
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const submitBtn = document.getElementById('submitBtn');
+
+      // Clear previous errors
+      utils.clearFieldError(document.getElementById('email'));
+      utils.clearFieldError(document.getElementById('password'));
+
+      // Validate email
+      if (!utils.validateEmail(email)) {
+        utils.showFieldError(document.getElementById('email'), 'Please enter a valid email address');
+        return;
+      }
+
+      // Validate password
+      const passwordValidation = utils.validatePassword(password);
+      if (!passwordValidation.isValid) {
+        utils.showFieldError(document.getElementById('password'), passwordValidation.message);
+        return;
+      }
+
+      // Disable button and show loading
+      utils.disableButton(submitBtn);
+      submitBtn.textContent = 'Creating Account...';
+
+      try {
+        // Sign up
+        await apiClient.post('/auth/signup', {
+          email: email,
+          password: password
+        });
+
+        // Login after signup to get token
+        const loginResponse = await apiClient.post('/auth/login', {
+          email: email,
+          password: password
+        });
+        authUtils.setToken(loginResponse.access_token);
+
+        utils.showToast('Account created successfully!', 'success');
+
+        // Redirect to dashboard or billing if plan selected
+        setTimeout(() => {
+          if (plan === 'standard' || plan === 'pro') {
+            // Redirect to dashboard, where user can subscribe to plan
+            window.location.href = 'dashboard.html?plan=' + plan;
+          } else {
+            window.location.href = 'dashboard.html';
+          }
+        }, 1000);
+
+      } catch (error) {
+        utils.enableButton(submitBtn);
+        submitBtn.textContent = 'Create Account';
+        utils.showToast(error.message || 'Failed to create account. Please try again.', 'error');
+
+        // Show field-specific errors if available
+        if (error.message.includes('email')) {
+          utils.showFieldError(document.getElementById('email'), error.message);
+        }
+        if (error.message.includes('password')) {
+          utils.showFieldError(document.getElementById('password'), error.message);
+        }
+      }
+    });
+
+    // Real-time validation
+    document.getElementById('email').addEventListener('blur', function() {
+      if (this.value && !utils.validateEmail(this.value)) {
+        utils.showFieldError(this, 'Please enter a valid email address');
+      } else {
+        utils.clearFieldError(this);
+      }
+    });
+
+    document.getElementById('password').addEventListener('blur', function() {
+      if (this.value) {
+        const validation = utils.validatePassword(this.value);
+        if (!validation.isValid) {
+          utils.showFieldError(this, validation.message);
+        } else {
+          utils.clearFieldError(this);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+

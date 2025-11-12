@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard – ReComposer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar Navigation -->
+    <div class="sidebar">
+      <div class="brand">ReComposer</div>
+      <nav>
+        <a href="#" class="nav-link active" data-section="email"><i>📧</i> <span>Email Assistant</span></a>
+        <a href="#" class="nav-link" data-section="campaigns"><i>📣</i> <span>Campaigns</span></a>
+        <a href="#" class="nav-link" data-section="contacts"><i>👥</i> <span>Contacts</span></a>
+        <a href="#" class="nav-link" data-section="analytics"><i>📊</i> <span>Analytics</span></a>
+        <a href="#" class="nav-link" data-section="settings"><i>⚙️</i> <span>Settings</span></a>
+      </nav>
+      <div class="sidebar-footer">
+        © 2025 RC
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+      <div class="topbar">
+        <div class="page-title" id="pageTitle">Dashboard</div>
+        <div class="user-info">
+          <img src="https://via.placeholder.com/32" alt="User Avatar" id="userAvatar"> 
+          Hello, <strong id="userName">Loading...</strong>
+          <a href="#" id="logoutBtn" style="margin-left: 1rem; color: #2F6BE8; text-decoration: none; font-size: 0.9rem;">Logout</a>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <!-- Email Assistant Section -->
+        <div id="email-section" class="dashboard-section email-assistant">
+          <h2>Email Assistant</h2>
+          <textarea id="emailInput" placeholder="Type your email here..."></textarea>
+          <select id="toneSelect">
+            <option value="professional">Professional</option>
+            <option value="friendly">Friendly</option>
+            <option value="persuasive">Persuasive</option>
+          </select>
+          <button id="rewriteBtn">Rewrite with AI</button>
+          
+          <div id="rewrittenResult" class="rewritten-result" style="display: none;">
+            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Rewritten Email:</h3>
+            <p id="rewrittenText"></p>
+          </div>
+
+          <div id="usageStats" class="usage-stats" style="display: none;">
+            <strong>Usage:</strong> <span id="usageText"></span>
+          </div>
+
+          <div style="margin-top: 2rem;">
+            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Recent Rewrites</h3>
+            <div id="rewriteHistory"></div>
+          </div>
+        </div>
+
+        <!-- Campaigns Section -->
+        <div id="campaigns-section" class="dashboard-section" style="display: none;">
+          <h2>Your Outreach Campaigns</h2>
+          <button id="createCampaignBtn" style="margin-bottom: 1rem; background: #2F6BE8; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 0.3rem; cursor: pointer;">Create New Campaign</button>
+          
+          <div id="campaignsList"></div>
+
+          <!-- Create Campaign Modal -->
+          <div id="createCampaignModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; padding: 2rem;">
+            <div style="background: #fff; max-width: 600px; margin: 0 auto; padding: 2rem; border-radius: 0.5rem; max-height: 90vh; overflow-y: auto;">
+              <h2>Create Campaign</h2>
+              <form id="campaignForm">
+                <label>Campaign Name</label>
+                <input type="text" id="campaignName" required style="width: 100%; padding: 0.5rem; margin-bottom: 1rem;">
+                
+                <label>Description</label>
+                <textarea id="campaignDescription" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; min-height: 80px;"></textarea>
+                
+                <label>Select Contacts</label>
+                <div id="contactsCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 0.5rem; margin-bottom: 1rem;"></div>
+                
+                <label>Email Steps</label>
+                <div id="emailSteps"></div>
+                <button type="button" id="addEmailStepBtn" style="margin-top: 0.5rem; background: #ccc; border: none; padding: 0.5rem 1rem; border-radius: 0.3rem; cursor: pointer;">Add Email Step</button>
+                
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                  <button type="submit" style="flex: 1; background: #2F6BE8; color: #fff; border: none; padding: 0.75rem; border-radius: 0.3rem; cursor: pointer;">Create Campaign</button>
+                  <button type="button" id="cancelCampaignBtn" style="flex: 1; background: #ccc; border: none; padding: 0.75rem; border-radius: 0.3rem; cursor: pointer;">Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contacts Section -->
+        <div id="contacts-section" class="dashboard-section" style="display: none;">
+          <h2>Contacts</h2>
+          <div style="margin-bottom: 1rem; display: flex; gap: 1rem;">
+            <input type="text" id="contactSearch" placeholder="Search contacts..." style="flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.3rem;">
+            <button id="createContactBtn" style="background: #2F6BE8; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 0.3rem; cursor: pointer;">Add Contact</button>
+          </div>
+          <div id="contactsList"></div>
+        </div>
+
+        <!-- Analytics Section -->
+        <div id="analytics-section" class="dashboard-section" style="display: none;">
+          <h2>Analytics</h2>
+          <div id="analyticsContent">
+            <p>Analytics dashboard coming soon...</p>
+          </div>
+        </div>
+
+        <!-- Settings Section -->
+        <div id="settings-section" class="dashboard-section" style="display: none;">
+          <h2>Settings</h2>
+          <div id="settingsContent">
+            <h3>Subscription Plan</h3>
+            <div id="subscriptionInfo" style="padding: 1rem; background: #f9f9f9; border-radius: 0.3rem; margin-top: 0.5rem;">
+              <p>Loading subscription information...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
+

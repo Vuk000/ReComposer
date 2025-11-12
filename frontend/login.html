@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login – ReComposer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>Welcome Back</h1>
+      <p>Log in to access your ReComposer dashboard</p>
+    </div>
+    <form class="login-form" id="loginForm">
+      <label for="email">Email Address</label>
+      <input type="email" id="email" name="email" placeholder="you@example.com" required>
+      
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" placeholder="Your password" required>
+      
+      <button type="submit" id="submitBtn">Log In</button>
+    </form>
+    <div class="login-options">
+      <div><a href="#">Forgot password?</a></div>
+      <div>New to ReComposer? <a href="signup.html">Sign up</a></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/utils.js"></script>
+  <script>
+    // Check if already logged in
+    if (authUtils.isAuthenticated()) {
+      // Verify token is still valid
+      authUtils.getCurrentUser()
+        .then(() => {
+          window.location.href = 'dashboard.html';
+        })
+        .catch(() => {
+          // Token invalid, continue with login
+        });
+    }
+
+    // Form submission
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const submitBtn = document.getElementById('submitBtn');
+
+      // Clear previous errors
+      utils.clearFieldError(document.getElementById('email'));
+      utils.clearFieldError(document.getElementById('password'));
+
+      // Validate email
+      if (!utils.validateEmail(email)) {
+        utils.showFieldError(document.getElementById('email'), 'Please enter a valid email address');
+        return;
+      }
+
+      // Disable button and show loading
+      utils.disableButton(submitBtn);
+      submitBtn.textContent = 'Logging in...';
+
+      try {
+        const response = await apiClient.post('/auth/login', {
+          email: email,
+          password: password
+        });
+
+        // Store token
+        authUtils.setToken(response.access_token);
+        utils.showToast('Login successful!', 'success');
+
+        // Redirect to dashboard
+        setTimeout(() => {
+          window.location.href = 'dashboard.html';
+        }, 500);
+
+      } catch (error) {
+        utils.enableButton(submitBtn);
+        submitBtn.textContent = 'Log In';
+        utils.showToast(error.message || 'Login failed. Please check your credentials.', 'error');
+
+        // Show field-specific errors
+        if (error.message.includes('email') || error.message.includes('password')) {
+          utils.showFieldError(document.getElementById('email'), 'Invalid email or password');
+          utils.showFieldError(document.getElementById('password'), 'Invalid email or password');
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+
