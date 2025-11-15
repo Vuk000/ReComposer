@@ -11,37 +11,90 @@ let campaignsList = [];
 // Initialize dashboard on page load
 document.addEventListener('DOMContentLoaded', async () => {
   // Check authentication
-  if (!authUtils.requireAuth()) {
+  if (typeof authUtils !== 'undefined' && !authUtils.requireAuth()) {
     return;
   }
 
   // Load user info
   try {
-    currentUser = await authUtils.getCurrentUser();
-    document.getElementById('userName').textContent = currentUser.email.split('@')[0];
+    if (typeof authUtils !== 'undefined') {
+      currentUser = await authUtils.getCurrentUser();
+    } else {
+      // Fallback if authUtils not loaded
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'login.html';
+        return;
+      }
+      const response = await fetch('http://localhost:8000/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        currentUser = await response.json();
+      } else {
+        window.location.href = 'login.html';
+        return;
+      }
+    }
+
+    const userNameElement = document.getElementById('userName');
+    if (userNameElement && currentUser) {
+      userNameElement.textContent = currentUser.email ? currentUser.email.split('@')[0] : 'User';
+    }
   } catch (error) {
-    utils.showToast('Failed to load user information', 'error');
-    authUtils.logout();
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Failed to load user information', 'error');
+    }
+    if (typeof authUtils !== 'undefined') {
+      authUtils.logout();
+    } else {
+      window.location.href = 'login.html';
+    }
     return;
   }
 
   // Setup logout
-  document.getElementById('logoutBtn').addEventListener('click', (e) => {
-    e.preventDefault();
-    authUtils.logout();
-  });
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof authUtils !== 'undefined') {
+        authUtils.logout();
+      } else {
+        localStorage.removeItem('token');
+        window.location.href = 'login.html';
+      }
+    });
+  }
 
   // Setup navigation
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       const section = link.getAttribute('data-section');
-      showSection(section);
+      if (section) {
+        showSection(section);
+      }
     });
   });
 
+  // Setup sidebar toggle for mobile
+  const sidebarToggle = document.querySelector('.sidebar-toggle');
+  const sidebar = document.querySelector('.sidebar');
+  if (sidebarToggle && sidebar) {
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      sidebarToggle.setAttribute('aria-expanded', sidebar.classList.contains('open'));
+    });
+  }
+
   // Setup email assistant
   setupEmailAssistant();
+  
+  // Load rewrite history on email section
+  loadRewriteHistory();
 
   // Setup campaigns
   setupCampaigns();
@@ -56,13 +109,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const plan = urlParams.get('plan');
   if (plan) {
-    // Show settings section to subscribe to plan
     showSection('settings');
-    utils.showToast('Please subscribe to a plan to continue', 'info', 5000);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Please subscribe to a plan to continue', 'info', 5000);
+    }
+  } else {
+    // Show default section
+    showSection('email');
   }
-
-  // Show default section
-  showSection('email');
 });
 
 /**
@@ -74,53 +128,41 @@ function showSection(section) {
     sec.style.display = 'none';
   });
 
-  // Update nav links
+  // Show selected section
+  const targetSection = document.getElementById(`${section}-section`);
+  if (targetSection) {
+    targetSection.style.display = 'block';
+    currentSection = section;
+  }
+
+  // Update navigation
   document.querySelectorAll('.nav-link').forEach(link => {
     link.classList.remove('active');
+    if (link.getAttribute('data-section') === section) {
+      link.classList.add('active');
+    }
   });
 
-  // Show selected section
-  const sectionElement = document.getElementById(section + '-section');
-  if (sectionElement) {
-    sectionElement.style.display = 'block';
-    currentSection = section;
-
-    // Update page title
+  // Update page title
+  const pageTitle = document.getElementById('pageTitle');
+  if (pageTitle) {
     const titles = {
       email: 'Email Assistant',
       campaigns: 'Campaigns',
       contacts: 'Contacts',
       analytics: 'Analytics',
-      settings: 'Settings'
+      settings: 'Settings',
     };
-    document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
-
-    // Activate nav link
-    document.querySelector(`[data-section="${section}"]`).classList.add('active');
-
-    // Load section data
-    loadSectionData(section);
+    pageTitle.textContent = titles[section] || 'Dashboard';
   }
-}
 
-/**
- * Load data for a section
- */
-async function loadSectionData(section) {
-  switch (section) {
-    case 'email':
-      await loadUsageStats();
-      await loadRewriteHistory();
-      break;
-    case 'campaigns':
-      await loadCampaigns();
-      break;
-    case 'contacts':
-      await loadContacts();
-      break;
-    case 'settings':
-      await loadSubscriptionInfo();
-      break;
+  // Load section-specific data
+  if (section === 'campaigns') {
+    loadCampaigns();
+  } else if (section === 'contacts') {
+    loadContacts();
+  } else if (section === 'settings') {
+    loadSettings();
   }
 }
 
@@ -128,83 +170,181 @@ async function loadSectionData(section) {
  * Setup Email Assistant
  */
 function setupEmailAssistant() {
-  document.getElementById('rewriteBtn').addEventListener('click', async () => {
-    const emailText = document.getElementById('emailInput').value.trim();
-    const tone = document.getElementById('toneSelect').value;
+  const rewriteBtn = document.getElementById('rewriteBtn');
+  const emailInput = document.getElementById('emailInput');
+  const toneSelect = document.getElementById('toneSelect');
+  const rewrittenResult = document.getElementById('rewrittenResult');
+  const rewrittenText = document.getElementById('rewrittenText');
+  const copyBtn = document.getElementById('copyBtn');
+  const usageStats = document.getElementById('usageStats');
 
-    if (!emailText) {
-      utils.showToast('Please enter an email to rewrite', 'error');
-      return;
-    }
+  if (rewriteBtn) {
+    rewriteBtn.addEventListener('click', async () => {
+      const emailText = emailInput ? emailInput.value.trim() : '';
+      const tone = toneSelect ? toneSelect.value : 'professional';
 
-    const button = document.getElementById('rewriteBtn');
-    utils.disableButton(button);
-    button.textContent = 'Rewriting...';
+      if (!emailText) {
+        if (typeof utils !== 'undefined') {
+          utils.showToast('Please enter an email to rewrite', 'error');
+        }
+        return;
+      }
 
-    try {
-      const response = await apiClient.post('/api/rewrite', {
-        email_text: emailText,
-        tone: tone
-      });
+      // Disable button and show loading
+      if (typeof utils !== 'undefined') {
+        utils.disableButton(rewriteBtn);
+      } else {
+        rewriteBtn.disabled = true;
+      }
 
-      // Show rewritten email
-      document.getElementById('rewrittenText').textContent = response.rewritten_email;
-      document.getElementById('rewrittenResult').style.display = 'block';
+      const btnText = rewriteBtn.querySelector('.btn-text');
+      const btnLoader = rewriteBtn.querySelector('.btn-loader');
+      if (btnText) btnText.style.display = 'none';
+      if (btnLoader) btnLoader.style.display = 'flex';
 
-      // Reload usage stats and history
-      await loadUsageStats();
-      await loadRewriteHistory();
+      try {
+        // Use the correct API endpoint
+        const response = await apiClient.rewriteEmail(emailText, tone);
 
-      utils.showToast('Email rewritten successfully!', 'success');
-    } catch (error) {
-      utils.showToast(error.message || 'Failed to rewrite email', 'error');
-    } finally {
-      utils.enableButton(button);
-      button.textContent = 'Rewrite with AI';
-    }
-  });
-}
+        if (rewrittenText) {
+          rewrittenText.textContent = response.rewritten_email || '';
+        }
 
-/**
- * Load usage statistics
- */
-async function loadUsageStats() {
-  try {
-    const usage = await apiClient.get('/api/rewrite/usage');
-    document.getElementById('usageText').textContent = 
-      `${usage.used} / ${usage.limit} rewrites used today (${usage.remaining} remaining) - ${usage.plan} plan`;
-    document.getElementById('usageStats').style.display = 'block';
-  } catch (error) {
-    console.error('Failed to load usage stats:', error);
+        if (rewrittenResult) {
+          rewrittenResult.style.display = 'block';
+        }
+
+        // Load usage stats
+        try {
+          const usageResponse = await apiClient.getUsageStats();
+          if (usageStats && usageResponse) {
+            const usageText = document.getElementById('usageText');
+            if (usageText) {
+              // Backend returns: used, limit, remaining, plan
+              usageText.textContent = `Used: ${usageResponse.used || 0} / ${usageResponse.limit || 'N/A'} rewrites today`;
+            }
+            usageStats.style.display = 'block';
+          }
+        } catch (usageError) {
+          // Usage stats are optional, don't fail if they can't be loaded
+          console.warn('Failed to load usage stats:', usageError);
+        }
+
+        if (typeof utils !== 'undefined') {
+          utils.showToast('Email rewritten successfully!', 'success');
+        }
+
+        // Reload rewrite history
+        loadRewriteHistory();
+
+      } catch (error) {
+        let errorMessage = 'Failed to rewrite email';
+        if (error.message) {
+          errorMessage = error.message;
+        } else if (error.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (error.status === 422) {
+          errorMessage = 'Invalid input. Please check your email text and tone selection.';
+        }
+        
+        if (typeof utils !== 'undefined') {
+          utils.showToast(errorMessage, 'error');
+        } else {
+          alert(errorMessage);
+        }
+      } finally {
+        if (typeof utils !== 'undefined') {
+          utils.enableButton(rewriteBtn);
+        } else {
+          rewriteBtn.disabled = false;
+        }
+        if (btnText) btnText.style.display = 'inline';
+        if (btnLoader) btnLoader.style.display = 'none';
+      }
+    });
+  }
+
+  // Copy button
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      if (rewrittenText && rewrittenText.textContent) {
+        if (typeof utils !== 'undefined') {
+          utils.copyToClipboard(rewrittenText.textContent);
+        } else {
+          navigator.clipboard.writeText(rewrittenText.textContent).then(() => {
+            alert('Copied to clipboard!');
+          });
+        }
+      }
+    });
   }
 }
 
 /**
- * Load rewrite history
+ * Load rewrite history from API
  */
 async function loadRewriteHistory() {
+  const historyContainer = document.getElementById('rewriteHistory');
+  if (!historyContainer) return;
+
   try {
-    const response = await apiClient.get('/api/rewrite/logs?limit=10');
-    const historyDiv = document.getElementById('rewriteHistory');
+    const response = await apiClient.getRewriteLogs(10, 0);
     
-    if (response.logs && response.logs.length > 0) {
-      historyDiv.innerHTML = '<ul style="list-style: none; padding: 0;">';
-      response.logs.forEach(log => {
-        const li = document.createElement('li');
-        li.style.padding = '0.5rem';
-        li.style.borderBottom = '1px solid #eee';
-        li.innerHTML = `
-          <strong>${log.tone}</strong> - ${utils.formatDateTime(log.created_at)}
-          <div style="font-size: 0.9rem; color: #666; margin-top: 0.25rem;">${log.original_email.substring(0, 100)}...</div>
-        `;
-        historyDiv.querySelector('ul').appendChild(li);
-      });
-      historyDiv.innerHTML += '</ul>';
-    } else {
-      historyDiv.innerHTML = '<p style="color: #666;">No rewrite history yet.</p>';
+    if (!response.logs || response.logs.length === 0) {
+      historyContainer.innerHTML = '<p style="color: #666; padding: 1rem;">No rewrite history yet.</p>';
+      return;
     }
+
+    historyContainer.innerHTML = '';
+    
+    response.logs.forEach(log => {
+      const historyItem = document.createElement('div');
+      historyItem.className = 'history-item';
+      historyItem.style.cssText = 'padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; margin-bottom: 0.75rem; background: #f9fafb;';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e5e7eb;';
+      
+      const toneBadge = document.createElement('span');
+      toneBadge.style.cssText = 'padding: 0.25rem 0.5rem; background: #2F6BE8; color: white; border-radius: 0.25rem; font-size: 0.75rem; text-transform: capitalize;';
+      toneBadge.textContent = log.tone || 'professional';
+      
+      const dateSpan = document.createElement('span');
+      dateSpan.style.cssText = 'color: #666; font-size: 0.85rem;';
+      if (log.created_at && typeof utils !== 'undefined') {
+        dateSpan.textContent = utils.formatDateTime(log.created_at);
+      } else if (log.created_at) {
+        dateSpan.textContent = new Date(log.created_at).toLocaleString();
+      }
+
+      headerDiv.appendChild(toneBadge);
+      headerDiv.appendChild(dateSpan);
+
+      const originalDiv = document.createElement('div');
+      originalDiv.style.cssText = 'margin-bottom: 0.5rem;';
+      const originalText = log.original_email || '';
+      originalDiv.innerHTML = `<strong style="color: #111;">Original:</strong> <span style="color: #666;">${utils && utils.escapeHtml ? utils.escapeHtml(originalText) : originalText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
+
+      const rewrittenDiv = document.createElement('div');
+      const rewrittenText = log.rewritten_email || '';
+      rewrittenDiv.innerHTML = `<strong style="color: #111;">Rewritten:</strong> <span style="color: #111;">${utils && utils.escapeHtml ? utils.escapeHtml(rewrittenText) : rewrittenText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`;
+
+      historyItem.appendChild(headerDiv);
+      historyItem.appendChild(originalDiv);
+      historyItem.appendChild(rewrittenDiv);
+
+      historyContainer.appendChild(historyItem);
+    });
+
   } catch (error) {
     console.error('Failed to load rewrite history:', error);
+    const errorMessage = error.status === 401 
+      ? 'Please login to view rewrite history'
+      : 'Failed to load rewrite history. Please try again.';
+    historyContainer.innerHTML = `<p style="color: #ef4444; padding: 1rem;">${errorMessage}</p>`;
+    if (typeof utils !== 'undefined' && error.status !== 401) {
+      utils.showToast('Failed to load rewrite history', 'error');
+    }
   }
 }
 
@@ -212,111 +352,71 @@ async function loadRewriteHistory() {
  * Setup Campaigns
  */
 function setupCampaigns() {
-  document.getElementById('createCampaignBtn').addEventListener('click', () => {
-    showCreateCampaignModal();
-  });
+  const createBtn = document.getElementById('createCampaignBtn');
+  const modal = document.getElementById('createCampaignModal');
+  const closeBtn = document.getElementById('closeCampaignModal');
+  const cancelBtn = document.getElementById('cancelCampaignBtn');
+  const campaignForm = document.getElementById('campaignForm');
+  const addEmailStepBtn = document.getElementById('addEmailStepBtn');
 
-  document.getElementById('cancelCampaignBtn').addEventListener('click', () => {
-    document.getElementById('createCampaignModal').style.display = 'none';
-  });
-
-  document.getElementById('campaignForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    await createCampaign();
-  });
-
-  document.getElementById('addEmailStepBtn').addEventListener('click', () => {
-    addEmailStep();
-  });
-}
-
-/**
- * Load campaigns
- */
-async function loadCampaigns() {
-  try {
-    const response = await apiClient.get('/api/campaigns?limit=50');
-    campaignsList = response.campaigns || [];
-    displayCampaigns(campaignsList);
-  } catch (error) {
-    utils.showToast('Failed to load campaigns', 'error');
-    console.error(error);
-  }
-}
-
-/**
- * Display campaigns
- */
-function displayCampaigns(campaigns) {
-  const listDiv = document.getElementById('campaignsList');
-  
-  if (campaigns.length === 0) {
-    listDiv.innerHTML = '<p>No campaigns yet. Create your first campaign to get started!</p>';
-    return;
+  if (createBtn && modal) {
+    createBtn.addEventListener('click', () => {
+      modal.style.display = 'flex';
+      resetCampaignForm();
+      loadContactsForCampaign();
+    });
   }
 
-  listDiv.innerHTML = '<table class="campaigns-table"><thead><tr><th>Campaign</th><th>Status</th><th>Recipients</th><th>Actions</th></tr></thead><tbody></tbody></table>';
-  const tbody = listDiv.querySelector('tbody');
+  if (closeBtn && modal) {
+    closeBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
 
-  campaigns.forEach(campaign => {
-    const tr = document.createElement('tr');
-    const stats = campaign.stats || {};
-    tr.innerHTML = `
-      <td><strong>${campaign.name}</strong></td>
-      <td class="status-${campaign.status.toLowerCase()}">${campaign.status}</td>
-      <td>${stats.total_recipients || 0}</td>
-      <td>
-        <button onclick="viewCampaign(${campaign.id})" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; background: #2F6BE8; color: #fff; border: none; border-radius: 0.2rem; cursor: pointer;">View</button>
-        ${campaign.status === 'DRAFT' ? `<button onclick="launchCampaign(${campaign.id})" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; background: #4caf50; color: #fff; border: none; border-radius: 0.2rem; cursor: pointer;">Launch</button>` : ''}
-        ${campaign.status === 'RUNNING' ? `<button onclick="pauseCampaign(${campaign.id})" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; background: #ff9800; color: #fff; border: none; border-radius: 0.2rem; cursor: pointer;">Pause</button>` : ''}
-        ${campaign.status === 'DRAFT' ? `<button onclick="deleteCampaign(${campaign.id})" style="padding: 0.25rem 0.5rem; background: #f44336; color: #fff; border: none; border-radius: 0.2rem; cursor: pointer;">Delete</button>` : ''}
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
+  if (cancelBtn && modal) {
+    cancelBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
 
-/**
- * Show create campaign modal
- */
-async function showCreateCampaignModal() {
-  // Load contacts for selection
-  await loadContactsForCampaign();
-  
-  // Reset form
-  document.getElementById('campaignName').value = '';
-  document.getElementById('campaignDescription').value = '';
-  document.getElementById('emailSteps').innerHTML = '';
-  addEmailStep(); // Add first step by default
-  
-  document.getElementById('createCampaignModal').style.display = 'block';
-}
+  if (addEmailStepBtn) {
+    addEmailStepBtn.addEventListener('click', () => {
+      addEmailStep();
+    });
+  }
 
-/**
- * Load contacts for campaign selection
- */
-async function loadContactsForCampaign() {
-  try {
-    const response = await apiClient.get('/api/contacts?limit=1000');
-    const checkboxesDiv = document.getElementById('contactsCheckboxes');
-    checkboxesDiv.innerHTML = '';
-    
-    if (response.contacts && response.contacts.length > 0) {
-      response.contacts.forEach(contact => {
-        const label = document.createElement('label');
-        label.style.display = 'block';
-        label.style.padding = '0.25rem';
-        label.innerHTML = `
-          <input type="checkbox" name="contact" value="${contact.id}" style="margin-right: 0.5rem;">
-          ${contact.name} (${contact.email})
-        `;
-        checkboxesDiv.appendChild(label);
+  if (campaignForm) {
+    campaignForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await createCampaignFromForm();
+    });
+  }
+
+  // Close modal on overlay click
+  if (modal) {
+    const overlay = modal.querySelector('.modal-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', () => {
+        modal.style.display = 'none';
       });
-    } else {
-      checkboxesDiv.innerHTML = '<p>No contacts available. Please add contacts first.</p>';
     }
-  } catch (error) {
-    console.error('Failed to load contacts:', error);
+  }
+}
+
+/**
+ * Reset campaign form
+ */
+function resetCampaignForm() {
+  const campaignName = document.getElementById('campaignName');
+  const campaignDescription = document.getElementById('campaignDescription');
+  const emailSteps = document.getElementById('emailSteps');
+  
+  if (campaignName) campaignName.value = '';
+  if (campaignDescription) campaignDescription.value = '';
+  if (emailSteps) {
+    emailSteps.innerHTML = '';
+    // Add first email step
+    addEmailStep();
   }
 }
 
@@ -324,225 +424,432 @@ async function loadContactsForCampaign() {
  * Add email step to campaign form
  */
 function addEmailStep() {
-  const stepsDiv = document.getElementById('emailSteps');
-  const stepNumber = stepsDiv.children.length + 1;
+  const emailSteps = document.getElementById('emailSteps');
+  if (!emailSteps) return;
+
+  const stepNumber = emailSteps.children.length + 1;
+  
   const stepDiv = document.createElement('div');
-  stepDiv.style.border = '1px solid #ddd';
-  stepDiv.style.padding = '1rem';
-  stepDiv.style.marginBottom = '1rem';
-  stepDiv.style.borderRadius = '0.3rem';
+  stepDiv.className = 'email-step';
+  stepDiv.style.cssText = 'padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; margin-bottom: 1rem; background: #f9fafb;';
+
   stepDiv.innerHTML = `
-    <h4>Step ${stepNumber}</h4>
-    <label>Subject</label>
-    <input type="text" class="step-subject" required style="width: 100%; padding: 0.5rem; margin-bottom: 0.5rem;">
-    <label>Body Template</label>
-    <textarea class="step-body" required style="width: 100%; padding: 0.5rem; min-height: 100px; margin-bottom: 0.5rem;"></textarea>
-    <label>Delay (days)</label>
-    <input type="number" class="step-delay-days" value="0" min="0" style="width: 100px; padding: 0.5rem; margin-right: 0.5rem;">
-    <label>Delay (hours)</label>
-    <input type="number" class="step-delay-hours" value="0" min="0" max="23" style="width: 100px; padding: 0.5rem;">
-    <button type="button" onclick="this.parentElement.remove()" style="float: right; background: #f44336; color: #fff; border: none; padding: 0.25rem 0.5rem; border-radius: 0.2rem; cursor: pointer;">Remove</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+      <strong>Step ${stepNumber}</strong>
+      <button type="button" class="remove-step-btn" style="background: #ef4444; color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 0.25rem; cursor: pointer; font-size: 0.85rem;">Remove</button>
+    </div>
+    <div class="form-group" style="margin-bottom: 0.75rem;">
+      <label>Subject</label>
+      <input type="text" class="step-subject" placeholder="Email subject" required style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.375rem;">
+    </div>
+    <div class="form-group" style="margin-bottom: 0.75rem;">
+      <label>Body Template</label>
+      <textarea class="step-body" placeholder="Email body (use {{name}} for personalization)" rows="4" required style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.375rem;"></textarea>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+      <div class="form-group">
+        <label>Delay Days</label>
+        <input type="number" class="step-delay-days" value="0" min="0" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.375rem;">
+      </div>
+      <div class="form-group">
+        <label>Delay Hours</label>
+        <input type="number" class="step-delay-hours" value="0" min="0" max="23" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.375rem;">
+      </div>
+    </div>
   `;
-  stepsDiv.appendChild(stepDiv);
+
+  // Add remove button handler
+  const removeBtn = stepDiv.querySelector('.remove-step-btn');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      stepDiv.remove();
+      // Renumber steps
+      renumberEmailSteps();
+    });
+  }
+
+  emailSteps.appendChild(stepDiv);
 }
 
 /**
- * Create campaign
+ * Renumber email steps
  */
-async function createCampaign() {
-  const name = document.getElementById('campaignName').value.trim();
-  const description = document.getElementById('campaignDescription').value.trim();
-  
-  // Get selected contacts
-  const selectedContacts = Array.from(document.querySelectorAll('#contactsCheckboxes input[type="checkbox"]:checked'))
-    .map(cb => parseInt(cb.value));
+function renumberEmailSteps() {
+  const emailSteps = document.getElementById('emailSteps');
+  if (!emailSteps) return;
 
-  if (selectedContacts.length === 0) {
-    utils.showToast('Please select at least one contact', 'error');
+  Array.from(emailSteps.children).forEach((step, index) => {
+    const stepNumber = index + 1;
+    const strong = step.querySelector('strong');
+    if (strong) {
+      strong.textContent = `Step ${stepNumber}`;
+    }
+  });
+}
+
+/**
+ * Create campaign from form
+ */
+async function createCampaignFromForm() {
+  const campaignName = document.getElementById('campaignName');
+  const campaignDescription = document.getElementById('campaignDescription');
+  const contactsCheckboxes = document.querySelectorAll('#contactsCheckboxes input[type="checkbox"]:checked');
+  const emailSteps = document.getElementById('emailSteps');
+
+  if (!campaignName || !campaignName.value.trim()) {
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Campaign name is required', 'error');
+    }
     return;
   }
 
-  // Get email steps
-  const steps = [];
-  const stepDivs = document.getElementById('emailSteps').children;
-  for (let i = 0; i < stepDivs.length; i++) {
-    const stepDiv = stepDivs[i];
-    const subject = stepDiv.querySelector('.step-subject').value.trim();
-    const body = stepDiv.querySelector('.step-body').value.trim();
-    const delayDays = parseInt(stepDiv.querySelector('.step-delay-days').value) || 0;
-    const delayHours = parseInt(stepDiv.querySelector('.step-delay-hours').value) || 0;
+  const selectedContactIds = Array.from(contactsCheckboxes).map(cb => parseInt(cb.value));
+  if (selectedContactIds.length === 0) {
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Please select at least one contact', 'error');
+    }
+    return;
+  }
+
+  const steps = Array.from(emailSteps.children).map((stepDiv, index) => {
+    const subject = stepDiv.querySelector('.step-subject')?.value.trim();
+    const body = stepDiv.querySelector('.step-body')?.value.trim();
+    const delayDays = parseInt(stepDiv.querySelector('.step-delay-days')?.value || '0');
+    const delayHours = parseInt(stepDiv.querySelector('.step-delay-hours')?.value || '0');
 
     if (!subject || !body) {
-      utils.showToast('Please fill in all email step fields', 'error');
-      return;
+      throw new Error(`Step ${index + 1} is incomplete. Please fill in subject and body.`);
     }
 
-    steps.push({
-      step_number: i + 1,
+    return {
+      step_number: index + 1,
       subject: subject,
       body_template: body,
       delay_days: delayDays,
-      delay_hours: delayHours
-    });
-  }
+      delay_hours: delayHours,
+    };
+  });
 
   if (steps.length === 0) {
-    utils.showToast('Please add at least one email step', 'error');
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Please add at least one email step', 'error');
+    }
     return;
   }
 
+  const campaignData = {
+    name: campaignName.value.trim(),
+    description: campaignDescription?.value.trim() || null,
+    contact_ids: selectedContactIds,
+    email_steps: steps,
+  };
+
   try {
-    await apiClient.post('/api/campaigns', {
-      name: name,
-      description: description,
-      contact_ids: selectedContacts,
-      email_steps: steps
+    await apiClient.createCampaign(campaignData);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Campaign created successfully!', 'success');
+    }
+    
+    const modal = document.getElementById('createCampaignModal');
+    if (modal) modal.style.display = 'none';
+    
+    loadCampaigns();
+  } catch (error) {
+    const errorMessage = error.message || 'Failed to create campaign';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
+  }
+}
+
+/**
+ * Load campaigns from API
+ */
+async function loadCampaigns() {
+  const campaignsList = document.getElementById('campaignsList');
+  if (!campaignsList) return;
+
+  // Show loading state
+  campaignsList.innerHTML = '<div class="empty-state"><p>Loading campaigns...</p></div>';
+
+  try {
+    const response = await apiClient.getCampaigns(100, 0);
+    
+    if (!response.campaigns || response.campaigns.length === 0) {
+      campaignsList.innerHTML = '<div class="empty-state"><p>No campaigns yet. Create your first campaign to get started!</p></div>';
+      return;
+    }
+
+    campaignsList.innerHTML = '';
+    
+    response.campaigns.forEach(campaign => {
+      const campaignCard = document.createElement('div');
+      campaignCard.className = 'campaign-card';
+      campaignCard.style.cssText = 'padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; background: #fff; margin-bottom: 1rem;';
+
+      const headerDiv = document.createElement('div');
+      headerDiv.style.cssText = 'display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;';
+
+      const titleDiv = document.createElement('div');
+      titleDiv.style.cssText = 'flex: 1;';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.style.cssText = 'font-weight: 600; font-size: 1.1rem; margin-bottom: 0.25rem; color: #111;';
+      nameDiv.textContent = campaign.name || 'Unnamed Campaign';
+
+      const statusBadge = document.createElement('span');
+      const statusColors = {
+        'draft': '#666',
+        'active': '#10b981',
+        'paused': '#f59e0b',
+        'completed': '#6366f1',
+      };
+      statusBadge.style.cssText = `display: inline-block; padding: 0.25rem 0.75rem; background: ${statusColors[campaign.status?.toLowerCase()] || '#666'}; color: white; border-radius: 0.25rem; font-size: 0.75rem; text-transform: capitalize; margin-top: 0.5rem;`;
+      statusBadge.textContent = campaign.status || 'draft';
+
+      titleDiv.appendChild(nameDiv);
+      titleDiv.appendChild(statusBadge);
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.style.cssText = 'display: flex; gap: 0.5rem;';
+
+      if (campaign.status === 'draft') {
+        const launchBtn = document.createElement('button');
+        launchBtn.textContent = 'Launch';
+        launchBtn.className = 'btn-primary';
+        launchBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem;';
+        launchBtn.onclick = () => launchCampaign(campaign.id);
+        actionsDiv.appendChild(launchBtn);
+      } else if (campaign.status === 'active') {
+        const pauseBtn = document.createElement('button');
+        pauseBtn.textContent = 'Pause';
+        pauseBtn.className = 'btn-secondary';
+        pauseBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem;';
+        pauseBtn.onclick = () => pauseCampaign(campaign.id);
+        actionsDiv.appendChild(pauseBtn);
+      }
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem; background: #ef4444; color: white; border: none; border-radius: 0.375rem; cursor: pointer;';
+      deleteBtn.onclick = () => {
+        if (confirm(`Are you sure you want to delete "${campaign.name}"?`)) {
+          deleteCampaign(campaign.id);
+        }
+      };
+      actionsDiv.appendChild(deleteBtn);
+
+      headerDiv.appendChild(titleDiv);
+      headerDiv.appendChild(actionsDiv);
+
+      const descDiv = document.createElement('div');
+      descDiv.style.cssText = 'color: #666; margin-bottom: 1rem;';
+      descDiv.textContent = campaign.description || 'No description';
+
+      const stepsDiv = document.createElement('div');
+      stepsDiv.style.cssText = 'color: #888; font-size: 0.9rem;';
+      stepsDiv.textContent = `${campaign.email_steps?.length || 0} email step(s)`;
+
+      campaignCard.appendChild(headerDiv);
+      campaignCard.appendChild(descDiv);
+      campaignCard.appendChild(stepsDiv);
+
+      campaignsList.appendChild(campaignCard);
     });
 
-    utils.showToast('Campaign created successfully!', 'success');
-    document.getElementById('createCampaignModal').style.display = 'none';
-    await loadCampaigns();
   } catch (error) {
-    utils.showToast(error.message || 'Failed to create campaign', 'error');
+    console.error('Failed to load campaigns:', error);
+    let errorMessage = 'Failed to load campaigns. Please try again.';
+    if (error.status === 401) {
+      errorMessage = 'Please login to view campaigns';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    campaignsList.innerHTML = `<div class="empty-state"><p style="color: #ef4444;">${errorMessage}</p></div>`;
+    if (typeof utils !== 'undefined' && error.status !== 401) {
+      utils.showToast(errorMessage, 'error');
+    }
   }
 }
 
 /**
- * View campaign
- */
-async function viewCampaign(campaignId) {
-  try {
-    const campaign = await apiClient.get(`/api/campaigns/${campaignId}`);
-    const recipients = await apiClient.get(`/api/campaigns/${campaignId}/recipients`);
-    
-    // Show campaign details in a modal or alert for now
-    alert(`Campaign: ${campaign.name}\nStatus: ${campaign.status}\nRecipients: ${recipients.total}`);
-  } catch (error) {
-    utils.showToast('Failed to load campaign details', 'error');
-  }
-}
-
-/**
- * Launch campaign
+ * Launch a campaign
  */
 async function launchCampaign(campaignId) {
-  if (!confirm('Are you sure you want to launch this campaign?')) {
-    return;
-  }
-
   try {
-    await apiClient.post(`/api/campaigns/${campaignId}/launch`);
-    utils.showToast('Campaign launched successfully!', 'success');
-    await loadCampaigns();
+    await apiClient.launchCampaign(campaignId);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Campaign launched successfully!', 'success');
+    }
+    loadCampaigns();
   } catch (error) {
-    utils.showToast(error.message || 'Failed to launch campaign', 'error');
+    const errorMessage = error.message || 'Failed to launch campaign';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
   }
 }
 
 /**
- * Pause campaign
+ * Pause a campaign
  */
 async function pauseCampaign(campaignId) {
   try {
-    await apiClient.post(`/api/campaigns/${campaignId}/pause`);
-    utils.showToast('Campaign paused successfully!', 'success');
-    await loadCampaigns();
+    await apiClient.pauseCampaign(campaignId);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Campaign paused successfully!', 'success');
+    }
+    loadCampaigns();
   } catch (error) {
-    utils.showToast(error.message || 'Failed to pause campaign', 'error');
+    const errorMessage = error.message || 'Failed to pause campaign';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
   }
 }
 
 /**
- * Delete campaign
+ * Delete a campaign
  */
 async function deleteCampaign(campaignId) {
-  if (!confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
-    return;
-  }
-
   try {
-    await apiClient.delete(`/api/campaigns/${campaignId}`);
-    utils.showToast('Campaign deleted successfully!', 'success');
-    await loadCampaigns();
+    await apiClient.deleteCampaign(campaignId);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Campaign deleted successfully!', 'success');
+    }
+    loadCampaigns();
   } catch (error) {
-    utils.showToast(error.message || 'Failed to delete campaign', 'error');
+    const errorMessage = error.message || 'Failed to delete campaign';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
   }
 }
-
-// Make functions available globally for onclick handlers
-window.viewCampaign = viewCampaign;
-window.launchCampaign = launchCampaign;
-window.pauseCampaign = pauseCampaign;
-window.deleteCampaign = deleteCampaign;
 
 /**
  * Setup Contacts
  */
 function setupContacts() {
-  document.getElementById('createContactBtn').addEventListener('click', () => {
-    showCreateContactModal();
-  });
+  const createBtn = document.getElementById('createContactBtn');
+  const searchInput = document.getElementById('contactSearch');
 
-  document.getElementById('contactSearch').addEventListener('input', (e) => {
-    filterContacts(e.target.value);
-  });
+  if (createBtn) {
+    createBtn.addEventListener('click', () => {
+      showCreateContactModal();
+    });
+  }
+
+  if (searchInput && typeof utils !== 'undefined') {
+    const debouncedSearch = utils.debounce((searchTerm) => {
+      loadContacts(searchTerm);
+    }, 300);
+
+    searchInput.addEventListener('input', (e) => {
+      debouncedSearch(e.target.value);
+    });
+  }
 }
 
 /**
- * Load contacts
+ * Load contacts from API
  */
-async function loadContacts() {
+async function loadContacts(searchTerm = '') {
+  const contactsList = document.getElementById('contactsList');
+  if (!contactsList) return;
+
+  // Show loading state
+  contactsList.innerHTML = '<div class="empty-state"><p>Loading contacts...</p></div>';
+
   try {
-    const response = await apiClient.get('/api/contacts?limit=1000');
-    contactsList = response.contacts || [];
-    displayContacts(contactsList);
+    const response = await apiClient.getContacts(100, 0, searchTerm);
+    
+    if (!response.contacts || response.contacts.length === 0) {
+      contactsList.innerHTML = '<div class="empty-state"><p>No contacts yet. Add your first contact to start building campaigns!</p></div>';
+      return;
+    }
+
+    contactsList.innerHTML = '';
+    
+    response.contacts.forEach(contact => {
+      const contactCard = document.createElement('div');
+      contactCard.className = 'contact-card';
+      contactCard.style.cssText = 'padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 0.5rem; background: #fff; transition: box-shadow 0.2s;';
+      contactCard.style.cssText += 'cursor: pointer;';
+      contactCard.onmouseover = () => contactCard.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+      contactCard.onmouseout = () => contactCard.style.boxShadow = 'none';
+
+      const nameDiv = document.createElement('div');
+      nameDiv.style.cssText = 'font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem; color: #111;';
+      nameDiv.textContent = contact.name || 'Unnamed Contact';
+
+      const emailDiv = document.createElement('div');
+      emailDiv.style.cssText = 'color: #666; margin-bottom: 0.5rem;';
+      emailDiv.textContent = contact.email || '';
+
+      const companyDiv = document.createElement('div');
+      companyDiv.style.cssText = 'color: #888; font-size: 0.9rem; margin-bottom: 0.5rem;';
+      if (contact.company) {
+        companyDiv.textContent = contact.company;
+      } else {
+        companyDiv.style.display = 'none';
+      }
+
+      const actionsDiv = document.createElement('div');
+      actionsDiv.style.cssText = 'display: flex; gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb;';
+
+      const editBtn = document.createElement('button');
+      editBtn.textContent = 'Edit';
+      editBtn.className = 'btn-secondary';
+      editBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem;';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        showEditContactModal(contact);
+      };
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.style.cssText = 'padding: 0.5rem 1rem; font-size: 0.9rem; background: #ef4444; color: white; border: none; border-radius: 0.375rem; cursor: pointer;';
+      deleteBtn.onclick = async (e) => {
+        e.stopPropagation();
+        if (confirm(`Are you sure you want to delete ${contact.name}?`)) {
+          await deleteContact(contact.id);
+        }
+      };
+
+      actionsDiv.appendChild(editBtn);
+      actionsDiv.appendChild(deleteBtn);
+
+      contactCard.appendChild(nameDiv);
+      contactCard.appendChild(emailDiv);
+      if (contact.company) {
+        contactCard.appendChild(companyDiv);
+      }
+      contactCard.appendChild(actionsDiv);
+
+      contactsList.appendChild(contactCard);
+    });
+
   } catch (error) {
-    utils.showToast('Failed to load contacts', 'error');
-    console.error(error);
+    console.error('Failed to load contacts:', error);
+    let errorMessage = 'Failed to load contacts. Please try again.';
+    if (error.status === 401) {
+      errorMessage = 'Please login to view contacts';
+    } else if (error.message) {
+      errorMessage = error.message;
+    }
+    contactsList.innerHTML = `<div class="empty-state"><p style="color: #ef4444;">${errorMessage}</p></div>`;
+    if (typeof utils !== 'undefined' && error.status !== 401) {
+      utils.showToast(errorMessage, 'error');
+    }
   }
-}
-
-/**
- * Display contacts
- */
-function displayContacts(contacts) {
-  const listDiv = document.getElementById('contactsList');
-  
-  if (contacts.length === 0) {
-    listDiv.innerHTML = '<p>No contacts yet. Add your first contact to get started!</p>';
-    return;
-  }
-
-  listDiv.innerHTML = '<table style="width: 100%; border-collapse: collapse;"><thead><tr><th>Name</th><th>Email</th><th>Company</th><th>Actions</th></tr></thead><tbody></tbody></table>';
-  const tbody = listDiv.querySelector('tbody');
-
-  contacts.forEach(contact => {
-    const tr = document.createElement('tr');
-    tr.style.borderBottom = '1px solid #eee';
-    tr.innerHTML = `
-      <td style="padding: 0.5rem;">${contact.name}</td>
-      <td style="padding: 0.5rem;">${contact.email}</td>
-      <td style="padding: 0.5rem;">${contact.company || '-'}</td>
-      <td style="padding: 0.5rem;">
-        <button onclick="editContact(${contact.id})" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; background: #2F6BE8; color: #fff; border: none; border-radius: 0.2rem; cursor: pointer;">Edit</button>
-        <button onclick="deleteContact(${contact.id})" style="padding: 0.25rem 0.5rem; background: #f44336; color: #fff; border: none; border-radius: 0.2rem; cursor: pointer;">Delete</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-/**
- * Filter contacts
- */
-function filterContacts(searchTerm) {
-  const filtered = contactsList.filter(contact => {
-    const term = searchTerm.toLowerCase();
-    return contact.name.toLowerCase().includes(term) ||
-           contact.email.toLowerCase().includes(term) ||
-           (contact.company && contact.company.toLowerCase().includes(term));
-  });
-  displayContacts(filtered);
 }
 
 /**
@@ -552,147 +859,186 @@ function showCreateContactModal() {
   const name = prompt('Contact Name:');
   if (!name) return;
 
-  const email = prompt('Contact Email:');
-  if (!email || !utils.validateEmail(email)) {
-    utils.showToast('Please enter a valid email address', 'error');
-    return;
-  }
+  const email = prompt('Email Address:');
+  if (!email) return;
 
-  const company = prompt('Company (optional):') || '';
+  const company = prompt('Company (optional):') || null;
 
-  createContact({ name, email, company });
+  createContact({
+    name: name.trim(),
+    email: email.trim(),
+    company: company ? company.trim() : null,
+  });
 }
 
 /**
- * Create contact
+ * Show edit contact modal
+ */
+function showEditContactModal(contact) {
+  const name = prompt('Contact Name:', contact.name || '');
+  if (name === null) return;
+
+  const email = prompt('Email Address:', contact.email || '');
+  if (email === null) return;
+
+  const company = prompt('Company (optional):', contact.company || '') || null;
+
+  updateContact(contact.id, {
+    name: name.trim(),
+    email: email.trim(),
+    company: company ? company.trim() : null,
+  });
+}
+
+/**
+ * Create a new contact
  */
 async function createContact(contactData) {
   try {
-    await apiClient.post('/api/contacts', contactData);
-    utils.showToast('Contact created successfully!', 'success');
-    await loadContacts();
+    await apiClient.createContact(contactData);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Contact created successfully!', 'success');
+    }
+    loadContacts();
   } catch (error) {
-    utils.showToast(error.message || 'Failed to create contact', 'error');
+    const errorMessage = error.message || 'Failed to create contact';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
   }
 }
 
 /**
- * Edit contact
+ * Update a contact
  */
-async function editContact(contactId) {
+async function updateContact(contactId, contactData) {
   try {
-    const contact = await apiClient.get(`/api/contacts/${contactId}`);
-    const name = prompt('Contact Name:', contact.name);
-    if (!name) return;
+    await apiClient.updateContact(contactId, contactData);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Contact updated successfully!', 'success');
+    }
+    loadContacts();
+  } catch (error) {
+    const errorMessage = error.message || 'Failed to update contact';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
+  }
+}
 
-    const email = prompt('Contact Email:', contact.email);
-    if (!email || !utils.validateEmail(email)) {
-      utils.showToast('Please enter a valid email address', 'error');
+/**
+ * Delete a contact
+ */
+async function deleteContact(contactId) {
+  try {
+    await apiClient.deleteContact(contactId);
+    if (typeof utils !== 'undefined') {
+      utils.showToast('Contact deleted successfully!', 'success');
+    }
+    loadContacts();
+  } catch (error) {
+    const errorMessage = error.message || 'Failed to delete contact';
+    if (typeof utils !== 'undefined') {
+      utils.showToast(errorMessage, 'error');
+    } else {
+      alert(errorMessage);
+    }
+  }
+}
+
+/**
+ * Load contacts for campaign selection
+ */
+async function loadContactsForCampaign() {
+  const checkboxesContainer = document.getElementById('contactsCheckboxes');
+  if (!checkboxesContainer) return;
+
+  checkboxesContainer.innerHTML = '<p style="color: #666; padding: 1rem;">Loading contacts...</p>';
+
+  try {
+    const response = await apiClient.getContacts(1000, 0);
+    
+    if (!response.contacts || response.contacts.length === 0) {
+      checkboxesContainer.innerHTML = '<p style="color: #666; padding: 1rem;">No contacts available. Please add contacts first.</p>';
       return;
     }
 
-    const company = prompt('Company:', contact.company || '') || null;
+    checkboxesContainer.innerHTML = '';
+    
+    response.contacts.forEach(contact => {
+      const label = document.createElement('label');
+      label.style.cssText = 'display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; cursor: pointer;';
 
-    await apiClient.put(`/api/contacts/${contactId}`, { name, email, company });
-    utils.showToast('Contact updated successfully!', 'success');
-    await loadContacts();
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = contact.id;
+      checkbox.name = 'contact_ids';
+      checkbox.style.cssText = 'cursor: pointer;';
+
+      const contactInfo = document.createElement('span');
+      contactInfo.textContent = `${contact.name} (${contact.email})`;
+      if (contact.company) {
+        contactInfo.textContent += ` - ${contact.company}`;
+      }
+
+      label.appendChild(checkbox);
+      label.appendChild(contactInfo);
+      checkboxesContainer.appendChild(label);
+    });
+
   } catch (error) {
-    utils.showToast(error.message || 'Failed to update contact', 'error');
+    console.error('Failed to load contacts for campaign:', error);
+    checkboxesContainer.innerHTML = '<p style="color: #ef4444; padding: 1rem;">Failed to load contacts.</p>';
   }
 }
-
-/**
- * Delete contact
- */
-async function deleteContact(contactId) {
-  if (!confirm('Are you sure you want to delete this contact?')) {
-    return;
-  }
-
-  try {
-    await apiClient.delete(`/api/contacts/${contactId}`);
-    utils.showToast('Contact deleted successfully!', 'success');
-    await loadContacts();
-  } catch (error) {
-    utils.showToast(error.message || 'Failed to delete contact', 'error');
-  }
-}
-
-// Make functions available globally
-window.editContact = editContact;
-window.deleteContact = deleteContact;
 
 /**
  * Setup Settings
  */
 function setupSettings() {
-  // Settings functionality is handled in loadSubscriptionInfo
+  // Settings setup logic
 }
 
 /**
- * Load subscription information
+ * Load settings
  */
-async function loadSubscriptionInfo() {
+async function loadSettings() {
+  const subscriptionInfo = document.getElementById('subscriptionInfo');
+  if (!subscriptionInfo) return;
+
+  subscriptionInfo.innerHTML = '<p>Loading subscription information...</p>';
+
   try {
-    const status = await apiClient.get('/billing/status');
-    const infoDiv = document.getElementById('subscriptionInfo');
-    
-    const planName = status.plan === 'pro' ? 'Pro ($49.99/mo)' : 'Standard ($14.99/mo)';
-    infoDiv.innerHTML = `
-      <p><strong>Current Plan:</strong> ${planName}</p>
-      <p><strong>Status:</strong> ${status.status}</p>
-      ${status.subscription_id ? `<p><strong>Subscription ID:</strong> ${status.subscription_id}</p>` : ''}
-      <div style="margin-top: 1rem;">
-        <button onclick="subscribeToPlan('standard')" style="margin-right: 0.5rem; padding: 0.5rem 1rem; background: #2F6BE8; color: #fff; border: none; border-radius: 0.3rem; cursor: pointer;">Subscribe to Standard</button>
-        <button onclick="subscribeToPlan('pro')" style="padding: 0.5rem 1rem; background: #2F6BE8; color: #fff; border: none; border-radius: 0.3rem; cursor: pointer;">Subscribe to Pro</button>
-      </div>
-      ${status.subscription_id ? `<button onclick="cancelSubscription()" style="margin-top: 0.5rem; padding: 0.5rem 1rem; background: #f44336; color: #fff; border: none; border-radius: 0.3rem; cursor: pointer;">Cancel Subscription</button>` : ''}
-    `;
-  } catch (error) {
-    const infoDiv = document.getElementById('subscriptionInfo');
-    if (error.message.includes('503')) {
-      infoDiv.innerHTML = '<p>Billing is currently disabled. Please contact support for subscription management.</p>';
+    // Try to get user info to show subscription status
+    if (typeof authUtils !== 'undefined') {
+      const user = await authUtils.getCurrentUser();
+      if (user) {
+        const plan = user.subscription_plan || 'none';
+        const planDisplay = plan === 'standard' ? 'Standard ($14.99/mo)' : 
+                           plan === 'pro' ? 'Pro ($49.99/mo)' : 
+                           'No active subscription';
+        
+        subscriptionInfo.innerHTML = `
+          <div style="padding: 1rem;">
+            <p><strong>Current Plan:</strong> ${planDisplay}</p>
+            <p style="margin-top: 0.5rem; color: #666; font-size: 0.9rem;">
+              ${plan === 'none' ? 'Subscribe to a plan to unlock all features.' : 'Manage your subscription from here.'}
+            </p>
+          </div>
+        `;
+      }
     } else {
-      infoDiv.innerHTML = `<p>Error loading subscription information: ${error.message}</p>`;
+      subscriptionInfo.innerHTML = '<p>Subscription information unavailable.</p>';
     }
-  }
-}
-
-/**
- * Subscribe to plan
- */
-async function subscribeToPlan(plan) {
-  if (!confirm(`Subscribe to ${plan} plan?`)) {
-    return;
-  }
-
-  try {
-    await apiClient.post('/billing/subscribe', { plan: plan });
-    utils.showToast(`Successfully subscribed to ${plan} plan!`, 'success');
-    await loadSubscriptionInfo();
   } catch (error) {
-    utils.showToast(error.message || 'Failed to subscribe', 'error');
+    console.error('Failed to load settings:', error);
+    const errorMessage = error.status === 401 
+      ? 'Please login to view subscription information'
+      : 'Failed to load subscription information';
+    subscriptionInfo.innerHTML = `<p style="color: #ef4444;">${errorMessage}</p>`;
   }
 }
-
-/**
- * Cancel subscription
- */
-async function cancelSubscription() {
-  if (!confirm('Are you sure you want to cancel your subscription? You will retain access until the end of the billing period.')) {
-    return;
-  }
-
-  try {
-    await apiClient.post('/billing/cancel');
-    utils.showToast('Subscription cancelled successfully', 'success');
-    await loadSubscriptionInfo();
-  } catch (error) {
-    utils.showToast(error.message || 'Failed to cancel subscription', 'error');
-  }
-}
-
-// Make functions available globally
-window.subscribeToPlan = subscribeToPlan;
-window.cancelSubscription = cancelSubscription;
-

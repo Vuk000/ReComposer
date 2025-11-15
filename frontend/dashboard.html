@@ -3,129 +3,237 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ReComposer Dashboard - Manage your AI email assistant, outreach campaigns, contacts, and analytics.">
   <title>Dashboard – ReComposer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <div class="app-container">
     <!-- Sidebar Navigation -->
-    <div class="sidebar">
-      <div class="brand">ReComposer</div>
-      <nav>
-        <a href="#" class="nav-link active" data-section="email"><i>📧</i> <span>Email Assistant</span></a>
-        <a href="#" class="nav-link" data-section="campaigns"><i>📣</i> <span>Campaigns</span></a>
-        <a href="#" class="nav-link" data-section="contacts"><i>👥</i> <span>Contacts</span></a>
-        <a href="#" class="nav-link" data-section="analytics"><i>📊</i> <span>Analytics</span></a>
-        <a href="#" class="nav-link" data-section="settings"><i>⚙️</i> <span>Settings</span></a>
+    <aside class="sidebar" role="complementary" aria-label="Dashboard navigation">
+      <div class="sidebar-header">
+        <div class="brand">ReComposer</div>
+        <button class="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+      <nav role="navigation" aria-label="Dashboard navigation">
+        <a href="#" class="nav-link active" data-section="email" aria-label="Email Assistant section">
+          <span class="nav-icon">📧</span>
+          <span class="nav-text">Email Assistant</span>
+        </a>
+        <a href="#" class="nav-link" data-section="campaigns" aria-label="Campaigns section">
+          <span class="nav-icon">📣</span>
+          <span class="nav-text">Campaigns</span>
+        </a>
+        <a href="#" class="nav-link" data-section="contacts" aria-label="Contacts section">
+          <span class="nav-icon">👥</span>
+          <span class="nav-text">Contacts</span>
+        </a>
+        <a href="#" class="nav-link" data-section="analytics" aria-label="Analytics section">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="#" class="nav-link" data-section="settings" aria-label="Settings section">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
-        © 2025 RC
+        <p>&copy; 2025 ReComposer</p>
       </div>
-    </div>
+    </aside>
 
     <!-- Main Content Area -->
-    <div class="main-content">
-      <div class="topbar">
-        <div class="page-title" id="pageTitle">Dashboard</div>
-        <div class="user-info">
-          <img src="https://via.placeholder.com/32" alt="User Avatar" id="userAvatar"> 
-          Hello, <strong id="userName">Loading...</strong>
-          <a href="#" id="logoutBtn" style="margin-left: 1rem; color: #2F6BE8; text-decoration: none; font-size: 0.9rem;">Logout</a>
+    <main class="main-content" role="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-title" id="pageTitle">Dashboard</h1>
         </div>
-      </div>
+        <div class="topbar-right">
+          <div class="user-info">
+            <img src="https://i.pravatar.cc/32?img=1" alt="User Avatar" id="userAvatar" class="user-avatar" onerror="this.style.display='none'">
+            <span class="user-greeting">Hello, <strong id="userName">Loading...</strong></span>
+            <a href="#" id="logoutBtn" class="logout-link" aria-label="Logout from account">Logout</a>
+          </div>
+        </div>
+      </header>
 
       <div class="content-area">
         <!-- Email Assistant Section -->
-        <div id="email-section" class="dashboard-section email-assistant">
-          <h2>Email Assistant</h2>
-          <textarea id="emailInput" placeholder="Type your email here..."></textarea>
-          <select id="toneSelect">
-            <option value="professional">Professional</option>
-            <option value="friendly">Friendly</option>
-            <option value="persuasive">Persuasive</option>
-          </select>
-          <button id="rewriteBtn">Rewrite with AI</button>
+        <section id="email-section" class="dashboard-section email-assistant" role="region" aria-label="Email Assistant">
+          <div class="section-header">
+            <h2>Email Assistant</h2>
+            <p class="section-description">Improve your emails with AI-powered rewriting</p>
+          </div>
           
-          <div id="rewrittenResult" class="rewritten-result" style="display: none;">
-            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Rewritten Email:</h3>
-            <p id="rewrittenText"></p>
+          <div class="email-form">
+            <div class="form-group">
+              <label for="emailInput">Your Email</label>
+              <textarea 
+                id="emailInput" 
+                placeholder="Type your email here..." 
+                rows="6"
+                aria-label="Email text input"
+                aria-describedby="email-hint"></textarea>
+              <small id="email-hint" class="form-hint">Enter the email you'd like to improve</small>
+            </div>
+            
+            <div class="form-group">
+              <label for="toneSelect">Tone</label>
+              <select id="toneSelect" aria-label="Select email tone">
+                <option value="professional">Professional</option>
+                <option value="friendly">Friendly</option>
+                <option value="persuasive">Persuasive</option>
+              </select>
+            </div>
+            
+            <button id="rewriteBtn" class="btn-primary" aria-label="Rewrite email with AI">
+              <span class="btn-text">Rewrite with AI</span>
+              <span class="btn-loader" style="display: none;">
+                <span class="spinner"></span>
+                Rewriting...
+              </span>
+            </button>
+          </div>
+          
+          <div id="rewrittenResult" class="rewritten-result" style="display: none;" role="region" aria-label="Rewritten email result">
+            <div class="result-header">
+              <h3>Rewritten Email</h3>
+              <button class="copy-btn" id="copyBtn" aria-label="Copy rewritten email">
+                <span>📋</span> Copy
+              </button>
+            </div>
+            <div class="result-content">
+              <p id="rewrittenText"></p>
+            </div>
           </div>
 
-          <div id="usageStats" class="usage-stats" style="display: none;">
+          <div id="usageStats" class="usage-stats" style="display: none;" role="region" aria-label="Usage statistics">
             <strong>Usage:</strong> <span id="usageText"></span>
           </div>
 
-          <div style="margin-top: 2rem;">
-            <h3 style="font-size: 1rem; margin-bottom: 0.5rem;">Recent Rewrites</h3>
-            <div id="rewriteHistory"></div>
+          <div class="recent-rewrites">
+            <h3>Recent Rewrites</h3>
+            <div id="rewriteHistory" class="rewrite-history"></div>
           </div>
-        </div>
+        </section>
 
         <!-- Campaigns Section -->
-        <div id="campaigns-section" class="dashboard-section" style="display: none;">
-          <h2>Your Outreach Campaigns</h2>
-          <button id="createCampaignBtn" style="margin-bottom: 1rem; background: #2F6BE8; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 0.3rem; cursor: pointer;">Create New Campaign</button>
+        <section id="campaigns-section" class="dashboard-section campaigns-section" style="display: none;" role="region" aria-label="Campaigns">
+          <div class="section-header">
+            <h2>Your Outreach Campaigns</h2>
+            <button id="createCampaignBtn" class="btn-primary" aria-label="Create new campaign">
+              <span>+</span> Create New Campaign
+            </button>
+          </div>
           
-          <div id="campaignsList"></div>
+          <div id="campaignsList" class="campaigns-list" role="list" aria-label="Campaign list">
+            <div class="empty-state">
+              <p>No campaigns yet. Create your first campaign to get started!</p>
+            </div>
+          </div>
 
           <!-- Create Campaign Modal -->
-          <div id="createCampaignModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; padding: 2rem;">
-            <div style="background: #fff; max-width: 600px; margin: 0 auto; padding: 2rem; border-radius: 0.5rem; max-height: 90vh; overflow-y: auto;">
-              <h2>Create Campaign</h2>
+          <div id="createCampaignModal" class="modal" style="display: none;" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+            <div class="modal-overlay"></div>
+            <div class="modal-content">
+              <div class="modal-header">
+                <h2 id="modal-title">Create Campaign</h2>
+                <button class="modal-close" id="closeCampaignModal" aria-label="Close modal">×</button>
+              </div>
               <form id="campaignForm">
-                <label>Campaign Name</label>
-                <input type="text" id="campaignName" required style="width: 100%; padding: 0.5rem; margin-bottom: 1rem;">
+                <div class="form-group">
+                  <label for="campaignName">Campaign Name</label>
+                  <input type="text" id="campaignName" required aria-required="true" placeholder="e.g., Q1 Product Launch">
+                </div>
                 
-                <label>Description</label>
-                <textarea id="campaignDescription" style="width: 100%; padding: 0.5rem; margin-bottom: 1rem; min-height: 80px;"></textarea>
+                <div class="form-group">
+                  <label for="campaignDescription">Description</label>
+                  <textarea id="campaignDescription" rows="3" placeholder="Brief description of your campaign"></textarea>
+                </div>
                 
-                <label>Select Contacts</label>
-                <div id="contactsCheckboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 0.5rem; margin-bottom: 1rem;"></div>
+                <div class="form-group">
+                  <label>Select Contacts</label>
+                  <div id="contactsCheckboxes" class="contacts-checkboxes" role="group" aria-label="Select contacts for campaign"></div>
+                </div>
                 
-                <label>Email Steps</label>
-                <div id="emailSteps"></div>
-                <button type="button" id="addEmailStepBtn" style="margin-top: 0.5rem; background: #ccc; border: none; padding: 0.5rem 1rem; border-radius: 0.3rem; cursor: pointer;">Add Email Step</button>
+                <div class="form-group">
+                  <label>Email Steps</label>
+                  <div id="emailSteps" class="email-steps"></div>
+                  <button type="button" id="addEmailStepBtn" class="btn-secondary">Add Email Step</button>
+                </div>
                 
-                <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
-                  <button type="submit" style="flex: 1; background: #2F6BE8; color: #fff; border: none; padding: 0.75rem; border-radius: 0.3rem; cursor: pointer;">Create Campaign</button>
-                  <button type="button" id="cancelCampaignBtn" style="flex: 1; background: #ccc; border: none; padding: 0.75rem; border-radius: 0.3rem; cursor: pointer;">Cancel</button>
+                <div class="modal-actions">
+                  <button type="submit" class="btn-primary">Create Campaign</button>
+                  <button type="button" id="cancelCampaignBtn" class="btn-secondary">Cancel</button>
                 </div>
               </form>
             </div>
           </div>
-        </div>
+        </section>
 
         <!-- Contacts Section -->
-        <div id="contacts-section" class="dashboard-section" style="display: none;">
-          <h2>Contacts</h2>
-          <div style="margin-bottom: 1rem; display: flex; gap: 1rem;">
-            <input type="text" id="contactSearch" placeholder="Search contacts..." style="flex: 1; padding: 0.5rem; border: 1px solid #ccc; border-radius: 0.3rem;">
-            <button id="createContactBtn" style="background: #2F6BE8; color: #fff; border: none; padding: 0.5rem 1rem; border-radius: 0.3rem; cursor: pointer;">Add Contact</button>
-          </div>
-          <div id="contactsList"></div>
-        </div>
-
-        <!-- Analytics Section -->
-        <div id="analytics-section" class="dashboard-section" style="display: none;">
-          <h2>Analytics</h2>
-          <div id="analyticsContent">
-            <p>Analytics dashboard coming soon...</p>
-          </div>
-        </div>
-
-        <!-- Settings Section -->
-        <div id="settings-section" class="dashboard-section" style="display: none;">
-          <h2>Settings</h2>
-          <div id="settingsContent">
-            <h3>Subscription Plan</h3>
-            <div id="subscriptionInfo" style="padding: 1rem; background: #f9f9f9; border-radius: 0.3rem; margin-top: 0.5rem;">
-              <p>Loading subscription information...</p>
+        <section id="contacts-section" class="dashboard-section contacts-section" style="display: none;" role="region" aria-label="Contacts">
+          <div class="section-header">
+            <h2>Contacts</h2>
+            <div class="section-actions">
+              <input 
+                type="text" 
+                id="contactSearch" 
+                placeholder="Search contacts..." 
+                class="search-input"
+                aria-label="Search contacts">
+              <button id="createContactBtn" class="btn-primary" aria-label="Add new contact">
+                <span>+</span> Add Contact
+              </button>
             </div>
           </div>
-        </div>
+          <div id="contactsList" class="contacts-list" role="list" aria-label="Contact list">
+            <div class="empty-state">
+              <p>No contacts yet. Add your first contact to start building campaigns!</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics-section" class="dashboard-section analytics-section" style="display: none;" role="region" aria-label="Analytics">
+          <div class="section-header">
+            <h2>Analytics</h2>
+          </div>
+          <div id="analyticsContent" class="analytics-content">
+            <div class="empty-state">
+              <p>Analytics dashboard coming soon. Track your email performance and campaign metrics here.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings-section" class="dashboard-section settings-section" style="display: none;" role="region" aria-label="Settings">
+          <div class="section-header">
+            <h2>Settings</h2>
+          </div>
+          <div id="settingsContent" class="settings-content">
+            <div class="settings-group">
+              <h3>Subscription Plan</h3>
+              <div id="subscriptionInfo" class="subscription-info">
+                <p>Loading subscription information...</p>
+              </div>
+            </div>
+            <div class="settings-group">
+              <h3>Account Settings</h3>
+              <div class="settings-item">
+                <label>Email Notifications</label>
+                <input type="checkbox" id="emailNotifications" checked>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   </div>
 
   <script src="js/api.js"></script>
@@ -134,4 +242,3 @@
   <script src="js/dashboard.js"></script>
 </body>
 </html>
-

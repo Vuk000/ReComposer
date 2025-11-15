@@ -1,89 +1,123 @@
 /**
  * Authentication Utilities
- * Handles JWT token storage, retrieval, and user authentication
+ * Handles user authentication, token management, and user session
  */
 
-const TOKEN_KEY = 'recompose_token';
+const authUtils = {
+  /**
+   * Check if user is authenticated
+   */
+  isAuthenticated() {
+    const token = localStorage.getItem('token');
+    return !!token;
+  },
 
-/**
- * Check if user is authenticated
- * @returns {boolean} True if token exists
- */
-function isAuthenticated() {
-  return !!getToken();
-}
+  /**
+   * Get stored token
+   */
+  getToken() {
+    return localStorage.getItem('token');
+  },
 
-/**
- * Get JWT token from localStorage
- * @returns {string|null} JWT token or null
- */
-function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
+  /**
+   * Set authentication token
+   */
+  setToken(token) {
+    localStorage.setItem('token', token);
+  },
 
-/**
- * Store JWT token in localStorage
- * @param {string} token - JWT token
- */
-function setToken(token) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
+  /**
+   * Remove authentication token
+   */
+  removeToken() {
+    localStorage.removeItem('token');
+  },
 
-/**
- * Remove JWT token from localStorage
- */
-function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
-}
+  /**
+   * Get current user information
+   */
+  async getCurrentUser() {
+    if (!this.isAuthenticated()) {
+      throw new Error('Not authenticated');
+    }
 
-/**
- * Get current user information
- * @returns {Promise<object>} User object
- */
-async function getCurrentUser() {
-  if (!isAuthenticated()) {
-    throw new Error('Not authenticated');
-  }
+    try {
+      const response = await fetch('http://localhost:8000/auth/me', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-  try {
-    const user = await apiClient.get('/auth/me');
-    return user;
-  } catch (error) {
-    // If token is invalid, clear it
-    clearToken();
-    throw error;
-  }
-}
+      if (!response.ok) {
+        if (response.status === 401) {
+          this.removeToken();
+          throw new Error('Session expired. Please login again.');
+        }
+        throw new Error('Failed to get user information');
+      }
 
-/**
- * Require authentication - redirect to login if not authenticated
- */
-function requireAuth() {
-  if (!isAuthenticated()) {
+      return await response.json();
+    } catch (error) {
+      this.removeToken();
+      throw error;
+    }
+  },
+
+  /**
+   * Logout user
+   */
+  logout() {
+    this.removeToken();
     window.location.href = 'login.html';
-    return false;
-  }
-  return true;
-}
+  },
 
-/**
- * Logout user
- */
-function logout() {
-  clearToken();
-  window.location.href = 'login.html';
-}
+  /**
+   * Require authentication - redirect to login if not authenticated
+   */
+  requireAuth() {
+    if (!this.isAuthenticated()) {
+      window.location.href = 'login.html';
+      return false;
+    }
+    return true;
+  },
 
-// Export functions for use in other scripts
-if (typeof window !== 'undefined') {
-  window.authUtils = {
-    isAuthenticated,
-    getToken,
-    setToken,
-    clearToken,
-    getCurrentUser,
-    requireAuth,
-    logout,
-  };
-}
+  /**
+   * Decode JWT token (basic implementation)
+   */
+  decodeToken(token) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return JSON.parse(jsonPayload);
+    } catch (error) {
+      return null;
+    }
+  },
 
+  /**
+   * Check if token is expired
+   */
+  isTokenExpired(token) {
+    const decoded = this.decodeToken(token);
+    if (!decoded || !decoded.exp) {
+      return true;
+    }
+
+    const currentTime = Date.now() / 1000;
+    return decoded.exp < currentTime;
+  },
+};
+
+// Export for use in other modules
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = authUtils;
+}

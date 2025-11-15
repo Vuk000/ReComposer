@@ -3,21 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="ReComposer - Transform your emails and outreach campaigns with AI-powered GPT-4o technology. Professional email assistance and automated cold outreach sequences." />
   <title>ReComposer – AI Emails & Outreach Campaigns</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <!-- Navigation -->
   <header>
-    <a href="index.html" class="logo">ReComposer</a>
-    <nav>
+    <a href="index.html" class="logo" aria-label="ReComposer Home">ReComposer</a>
+    <button class="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+    <nav id="main-nav" role="navigation" aria-label="Main navigation">
       <ul>
-        <li><a href="#features">Features</a></li>
-        <li><a href="#pricing">Pricing</a></li>
-        <li><a href="#testimonials">Testimonials</a></li>
-        <li><a href="#faq">FAQ</a></li>
-        <li><a href="login.html" class="nav-cta">Login</a></li>
+        <li><a href="#features" aria-label="View features section">Features</a></li>
+        <li><a href="#pricing" aria-label="View pricing section">Pricing</a></li>
+        <li><a href="#testimonials" aria-label="View testimonials section">Testimonials</a></li>
+        <li><a href="#faq" aria-label="View FAQ section">FAQ</a></li>
+        <li><a href="login.html" class="nav-cta" aria-label="Login to your account">Login</a></li>
       </ul>
     </nav>
   </header>
@@ -28,169 +34,314 @@
       <h1>Transform Your Emails & Outreach with AI</h1>
       <p class="subheadline">ReComposer uses GPT-4<sup>o</sup> to rewrite your emails and automate cold outreach campaigns. No free trial needed – get full value from Day 1 with our professional, AI-driven platform (7-day money-back guarantee).</p>
       <div class="cta-buttons">
-        <a href="signup.html?plan=standard" class="cta-primary">Get Started for $14.99</a>
-        <a href="#pricing" class="cta-secondary">View Pricing</a>
+        <a href="signup.html?plan=standard" class="cta-primary" aria-label="Get started with Standard plan">Get Started for $14.99</a>
+        <a href="#pricing" class="cta-secondary" aria-label="View pricing plans">View Pricing</a>
       </div>
       <div class="trust-badges">
-        <span>Built on GPT-4<sup>o</sup></span>
-        <span>High deliverability</span>
-        <span>7-Day Guarantee</span>
-        <span>Secure & Private</span>
+        <span>🚀 Powered by GPT-4<sup>o</sup></span>
+        <span>👍 1,000+ professionals onboard</span>
+        <span>💌 99% deliverability guaranteed</span>
+        <span>✅ 7-Day Money-Back Guarantee</span>
       </div>
     </div>
     <div class="hero-image">
-      <img src="https://via.placeholder.com/600x400?text=ReComposer+Email+Assistant" alt="ReComposer email assistant preview">
+      <div class="device-frame">
+        <img src="https://via.placeholder.com/600x400/2F6BE8/FFFFFF?text=ReComposer+Email+Assistant+Dashboard" alt="ReComposer email assistant preview showing AI-powered email rewriting interface">
+      </div>
     </div>
   </section>
 
   <!-- Features/Benefits Section -->
   <section id="features" class="features">
-    <div class="feature-grid">
-      <div class="feature-item">
-        <h3>AI Email Assistant</h3>
-        <p>Improve every email with GPT-4<sup>o</sup>. Write with perfect tone, clarity, and impact – simply by having the AI rephrase and optimize your drafts.</p>
-        <ul>
-          <li>Instantly rewrites emails for professionalism</li>
-          <li>Adapts tone (formal, friendly, etc.) with one click</li>
-          <li>Saves hours on editing and proofreading</li>
-        </ul>
-      </div>
-      <div class="feature-item">
-        <h3>Outreach Campaign Builder</h3>
-        <p>Launch automated cold-email sequences that feel personal. Plan follow-ups, track results, and let AI personalize each message to each prospect.</p>
-        <ul>
-          <li>Multi-step email sequences with scheduling</li>
-          <li>AI personalization boosts reply rates</li>
-          <li>Tracking for opens, clicks, and replies</li>
-        </ul>
+    <div class="container">
+      <h2 class="section-title">Powerful Features for Modern Professionals</h2>
+      <div class="feature-grid">
+        <div class="feature-item">
+          <div class="feature-icon">📧</div>
+          <h3>AI Email Assistant</h3>
+          <p>Improve every email with GPT-4<sup>o</sup>. Write with perfect tone, clarity, and impact – simply by having the AI rephrase and optimize your drafts.</p>
+          <ul>
+            <li>Instantly rewrites emails for professionalism</li>
+            <li>Adapts tone (formal, friendly, etc.) with one click</li>
+            <li>Saves hours on editing and proofreading</li>
+          </ul>
+        </div>
+        <div class="feature-item">
+          <div class="feature-icon">✈️</div>
+          <h3>Outreach Campaign Builder</h3>
+          <p>Launch automated cold-email sequences that feel personal. Plan follow-ups, track results, and let AI personalize each message to each prospect.</p>
+          <ul>
+            <li>Multi-step email sequences with scheduling</li>
+            <li>AI personalization boosts reply rates</li>
+            <li>Tracking for opens, clicks, and replies</li>
+          </ul>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Pricing Section -->
   <section id="pricing" class="pricing">
-    <h2>Pricing Plans</h2>
-    <p class="subtitle">Professional email power for individuals and teams. <strong>No free trials</strong> – just instant value. Upgrade, downgrade, or cancel anytime.</p>
-    <div class="pricing-cards">
-      <!-- Standard Plan Card -->
-      <div class="price-card">
-        <h3>Standard</h3>
-        <p class="price">$14.99<span style="font-size: 1rem;">/mo</span></p>
-        <p class="plan-desc">Essential AI email assistance</p>
-        <ul>
-          <li>Unlimited AI email rewrites</li>
-          <li>Grammar & tone improvement</li>
-          <li>Standard email support</li>
-        </ul>
-        <a href="signup.html?plan=standard" class="plan-cta">Get Standard</a>
+    <div class="container">
+      <h2>Simple, Fair Pricing</h2>
+      <p class="subtitle">Professional email power for individuals and teams. <strong>No free trials</strong> – just instant value. Upgrade, downgrade, or cancel anytime.</p>
+      <div class="pricing-cards">
+        <!-- Standard Plan Card -->
+        <div class="price-card">
+          <h3>Standard</h3>
+          <p class="price">$14.99<span class="price-period">/mo</span></p>
+          <p class="plan-desc">Essential AI email assistance</p>
+          <ul>
+            <li>Unlimited AI email rewrites</li>
+            <li>Grammar & tone improvement</li>
+            <li>Standard email support</li>
+          </ul>
+          <a href="signup.html?plan=standard" class="plan-cta" aria-label="Sign up for Standard plan">Get Standard</a>
+        </div>
+        <!-- Pro Plan Card -->
+        <div class="price-card highlight">
+          <div class="popular-badge">Most Popular</div>
+          <h3>Pro</h3>
+          <p class="price">$49.99<span class="price-period">/mo</span></p>
+          <p class="plan-desc">Email Assistant + Outreach Suite</p>
+          <ul>
+            <li>All Standard features</li>
+            <li>Cold outreach sequences</li>
+            <li>AI personalization for each email</li>
+            <li>Analytics & tracking dashboard</li>
+            <li>Priority support</li>
+          </ul>
+          <a href="signup.html?plan=pro" class="plan-cta" aria-label="Sign up for Pro plan">Get Pro</a>
+        </div>
       </div>
-      <!-- Pro Plan Card -->
-      <div class="price-card highlight">
-        <h3>Pro</h3>
-        <p class="price">$49.99<span style="font-size: 1rem;">/mo</span></p>
-        <p class="plan-desc">Email Assistant + Outreach Suite</p>
-        <ul>
-          <li>All Standard features</li>
-          <li>Cold outreach sequences</li>
-          <li>AI personalization for each email</li>
-          <li>Analytics & tracking dashboard</li>
-          <li>Priority support</li>
-        </ul>
-        <a href="signup.html?plan=pro" class="plan-cta">Get Pro</a>
+      <div class="pricing-trust-signals">
+        <p class="guarantee-note">✔ <span>7-day money-back guarantee</span> on all plans</p>
+        <p class="trust-line">🔒 Secure payment processing</p>
+        <p class="trust-line">No hidden fees, cancel anytime</p>
       </div>
     </div>
-    <p class="guarantee-note">✔ <span>7-day money-back guarantee</span> on all plans</p>
   </section>
 
   <!-- Testimonials Section -->
   <section id="testimonials" class="testimonials">
-    <h2>What Our Customers Say</h2>
-    <div class="testimonial-list">
-      <div class="testimonial">
-        <p>"ReComposer's AI has completely transformed how our team writes outreach emails. We've doubled our reply rate – it pays for itself within days."</p>
-        <p class="author">– Jane D., SDR Manager<span>TechCorp Inc.</span></p>
-      </div>
-      <div class="testimonial">
-        <p>"I was skeptical of no free trial, but I'm glad I gave it a shot. The email improvements are phenomenal and our cold campaigns now actually get responses!"</p>
-        <p class="author">– John S., Founder<span>Startup XYZ</span></p>
-      </div>
-      <div class="testimonial">
-        <p>"The quality is top-notch. My emails sound professional and the outreach sequence tool is a game changer for our sales funnel. Highly recommended!"</p>
-        <p class="author">– Lisa T., Sales Lead<span>MarketingPro Co.</span></p>
+    <div class="container">
+      <h2>What Our Customers Say</h2>
+      <div class="testimonial-list">
+        <div class="testimonial">
+          <div class="testimonial-avatar">
+            <img src="https://i.pravatar.cc/150?img=47" alt="Jane D. avatar" onerror="this.style.display='none'">
+          </div>
+          <p>"ReComposer's AI has completely transformed how our team writes outreach emails. We've doubled our reply rate – it pays for itself within days."</p>
+          <p class="author">– Jane D., SDR Manager<span>TechCorp Inc.</span></p>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-avatar">
+            <img src="https://i.pravatar.cc/150?img=12" alt="John S. avatar" onerror="this.style.display='none'">
+          </div>
+          <p>"I was skeptical of no free trial, but I'm glad I gave it a shot. The email improvements are phenomenal and our cold campaigns now actually get responses!"</p>
+          <p class="author">– John S., Founder<span>Startup XYZ</span></p>
+        </div>
+        <div class="testimonial">
+          <div class="testimonial-avatar">
+            <img src="https://i.pravatar.cc/150?img=32" alt="Lisa T. avatar" onerror="this.style.display='none'">
+          </div>
+          <p>"The quality is top-notch. My emails sound professional and the outreach sequence tool is a game changer for our sales funnel. Highly recommended!"</p>
+          <p class="author">– Lisa T., Sales Lead<span>MarketingPro Co.</span></p>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- FAQ Section -->
   <section id="faq" class="faq">
-    <h2>Frequently Asked Questions</h2>
-    <div class="faq-item">
-      <div class="faq-question">Q: Is there a free trial?</div>
-      <div class="faq-answer">A: No, ReComposer does not offer a free trial. We believe in delivering full value from Day 1. To ensure your satisfaction, we provide a 7-day money-back guarantee – if ReComposer isn't right for you, you can cancel in the first week for a full refund.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-question">Q: How does the 7-day money-back guarantee work?</div>
-      <div class="faq-answer">A: It's simple – if you're not fully satisfied within the first 7 days of your subscription, just let us know, and we'll refund your payment. No hassle, no risk. We're confident you'll love ReComposer, but we want you to have peace of mind trying it out.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-question">Q: What is GPT-4<sup>o</sup> and how is it used?</div>
-      <div class="faq-answer">A: GPT-4<sup>o</sup> is the advanced AI language model that powers ReComposer's email assistant. It analyzes your email drafts and generates improved versions with better wording, tone, and clarity, all in seconds. You get the benefit of cutting-edge AI (GPT-4 caliber) working for you.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-question">Q: How are outreach emails sent and will they land in Inbox?</div>
-      <div class="faq-answer">A: Outreach sequences are sent via your connected email account (e.g., Gmail or Outlook). ReComposer staggers sends and includes email warm-up techniques to maximize deliverability. We also help with proper setup (SPF/DKIM) to ensure your cold emails land in inboxes, not spam.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-question">Q: Can I upgrade or cancel my plan at any time?</div>
-      <div class="faq-answer">A: Yes, plans are month-to-month. You can upgrade from Standard to Pro or cancel/renew anytime from your dashboard settings. If you cancel, you won't be billed for the next cycle and will retain access for the paid period.</div>
-    </div>
-    <div class="faq-item">
-      <div class="faq-question">Q: What support is included?</div>
-      <div class="faq-answer">A: Standard plan includes email support (responses within 1 business day). Pro plan comes with priority support – you'll get responses within a few hours during business times, plus a dedicated onboarding session if needed. We're here to ensure you succeed with ReComposer.</div>
+    <div class="container">
+      <h2>Frequently Asked Questions</h2>
+      <div class="faq-list">
+        <div class="faq-item">
+          <div class="faq-question" role="button" aria-expanded="false" aria-controls="faq-answer-1" tabindex="0">
+            <span>Q: Is there a free trial?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer" id="faq-answer-1" role="region">
+            <p>A: No, ReComposer does not offer a free trial. We believe in delivering full value from Day 1. To ensure your satisfaction, we provide a 7-day money-back guarantee – if ReComposer isn't right for you, you can cancel in the first week for a full refund.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" aria-expanded="false" aria-controls="faq-answer-2" tabindex="0">
+            <span>Q: How does the 7-day money-back guarantee work?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer" id="faq-answer-2" role="region">
+            <p>A: It's simple – if you're not fully satisfied within the first 7 days of your subscription, just let us know, and we'll refund your payment. No hassle, no risk. We're confident you'll love ReComposer, but we want you to have peace of mind trying it out.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" aria-expanded="false" aria-controls="faq-answer-3" tabindex="0">
+            <span>Q: What is GPT-4<sup>o</sup> and how is it used?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer" id="faq-answer-3" role="region">
+            <p>A: GPT-4<sup>o</sup> is the advanced AI language model that powers ReComposer's email assistant. It analyzes your email drafts and generates improved versions with better wording, tone, and clarity, all in seconds. You get the benefit of cutting-edge AI (GPT-4 caliber) working for you.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" aria-expanded="false" aria-controls="faq-answer-4" tabindex="0">
+            <span>Q: How are outreach emails sent and will they land in Inbox?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer" id="faq-answer-4" role="region">
+            <p>A: Outreach sequences are sent via your connected email account (e.g., Gmail or Outlook). ReComposer staggers sends and includes email warm-up techniques to maximize deliverability. We also help with proper setup (SPF/DKIM) to ensure your cold emails land in inboxes, not spam.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" aria-expanded="false" aria-controls="faq-answer-5" tabindex="0">
+            <span>Q: Can I upgrade or cancel my plan at any time?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer" id="faq-answer-5" role="region">
+            <p>A: Yes, plans are month-to-month. You can upgrade from Standard to Pro or cancel/renew anytime from your dashboard settings. If you cancel, you won't be billed for the next cycle and will retain access for the paid period.</p>
+          </div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-question" role="button" aria-expanded="false" aria-controls="faq-answer-6" tabindex="0">
+            <span>Q: What support is included?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer" id="faq-answer-6" role="region">
+            <p>A: Standard plan includes email support (responses within 1 business day). Pro plan comes with priority support – you'll get responses within a few hours during business times, plus a dedicated onboarding session if needed. We're here to ensure you succeed with ReComposer.</p>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- Final CTA Banner -->
   <section class="cta-banner">
-    <h3>Ready to Supercharge Your Outreach?</h3>
-    <a href="signup.html">Get Started with ReComposer</a>
-    <p style="margin-top:0.5rem; font-size:0.9rem; color:#333;">7-day money-back guarantee • Cancel any time</p>
+    <div class="container">
+      <h3>Ready to Supercharge Your Outreach?</h3>
+      <p class="cta-subtitle">Join thousands of professionals who trust ReComposer for their email needs</p>
+      <a href="signup.html" class="cta-button" aria-label="Sign up for ReComposer">Get Started with ReComposer</a>
+      <p class="cta-note">7-day money-back guarantee • Cancel any time</p>
+    </div>
   </section>
 
   <!-- Footer -->
   <footer>
-    <div class="footer-links">
-      <a href="#pricing">Pricing</a> • 
-      <a href="#">Privacy Policy</a> • 
-      <a href="#">Terms of Service</a> • 
-      <a href="mailto:support@recomposer.com">Contact Us</a>
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <h3>ReComposer</h3>
+          <p>AI-powered email assistance and outreach automation for modern professionals.</p>
+        </div>
+        <div class="footer-links">
+          <div class="footer-column">
+            <h4>Product</h4>
+            <ul>
+              <li><a href="#features">Features</a></li>
+              <li><a href="#pricing">Pricing</a></li>
+              <li><a href="#testimonials">Testimonials</a></li>
+            </ul>
+          </div>
+          <div class="footer-column">
+            <h4>Company</h4>
+            <ul>
+              <li><a href="#faq">FAQ</a></li>
+              <li><a href="mailto:support@recomposer.com">Contact Us</a></li>
+              <li><a href="#">Privacy Policy</a></li>
+              <li><a href="#">Terms of Service</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 ReComposer Inc. All rights reserved.</p>
+      </div>
     </div>
-    <p>&copy; 2025 ReComposer Inc. All rights reserved.</p>
   </footer>
 
-  <!-- FAQ accordion script -->
+  <!-- Scripts -->
   <script>
-    document.querySelectorAll('.faq-question').forEach(q => {
+    // Mobile menu toggle
+    const menuToggle = document.querySelector('.mobile-menu-toggle');
+    const mainNav = document.getElementById('main-nav');
+    
+    if (menuToggle && mainNav) {
+      menuToggle.addEventListener('click', () => {
+        const isOpen = mainNav.classList.contains('mobile-open');
+        mainNav.classList.toggle('mobile-open');
+        menuToggle.setAttribute('aria-expanded', !isOpen);
+        document.body.style.overflow = !isOpen ? 'hidden' : '';
+      });
+
+      // Close menu when clicking outside
+      document.addEventListener('click', (e) => {
+        if (mainNav.classList.contains('mobile-open') && 
+            !mainNav.contains(e.target) && 
+            !menuToggle.contains(e.target)) {
+          mainNav.classList.remove('mobile-open');
+          menuToggle.setAttribute('aria-expanded', 'false');
+          document.body.style.overflow = '';
+        }
+      });
+    }
+
+    // FAQ accordion
+    document.querySelectorAll('.faq-question').forEach((q) => {
       q.addEventListener('click', () => {
         const item = q.parentNode;
+        const isOpen = item.classList.contains('open');
+        const allItems = document.querySelectorAll('.faq-item');
+        
+        // Close all other items
+        allItems.forEach(i => {
+          if (i !== item) {
+            i.classList.remove('open');
+            const otherQ = i.querySelector('.faq-question');
+            otherQ.setAttribute('aria-expanded', 'false');
+          }
+        });
+        
+        // Toggle current item
         item.classList.toggle('open');
+        q.setAttribute('aria-expanded', !isOpen);
+      });
+      
+      // Keyboard support
+      q.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          q.click();
+        }
       });
     });
 
     // Smooth scrolling for anchor links
     document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       anchor.addEventListener('click', function (e) {
+        const href = this.getAttribute('href');
+        if (href === '#') return;
+        
         e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
+        const target = document.querySelector(href);
         if (target) {
-          target.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+          const headerOffset = 80;
+          const elementPosition = target.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
           });
+
+          // Close mobile menu if open
+          if (mainNav && mainNav.classList.contains('mobile-open')) {
+            mainNav.classList.remove('mobile-open');
+            menuToggle.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = '';
+          }
         }
       });
     });
   </script>
 </body>
 </html>
-

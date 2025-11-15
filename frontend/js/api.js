@@ -1,152 +1,308 @@
 /**
- * API Client for ReComposer Backend
- * Handles all API communication with the FastAPI backend
+ * API Client for ReComposer
+ * Handles all API communication with the backend
+ * 
+ * Note: Backend CORS must be configured to allow frontend origin.
+ * Set CORS_ORIGINS environment variable in backend to include frontend URL.
  */
 
 const API_BASE_URL = 'http://localhost:8000';
 
-/**
- * Get JWT token from localStorage
- */
-function getToken() {
-  return localStorage.getItem('recompose_token');
-}
+class ApiClient {
+  constructor(baseURL = API_BASE_URL) {
+    this.baseURL = baseURL;
+  }
 
-/**
- * Generic API request function
- * @param {string} method - HTTP method (GET, POST, PUT, DELETE)
- * @param {string} endpoint - API endpoint (e.g., '/auth/login')
- * @param {object|null} data - Request body data (null for GET requests)
- * @returns {Promise<object>} Response data
- */
-async function apiRequest(method, endpoint, data = null) {
-  const url = `${API_BASE_URL}${endpoint}`;
-  const options = {
-    method: method,
-    headers: {
+  /**
+   * Get authorization headers
+   */
+  getHeaders() {
+    const headers = {
       'Content-Type': 'application/json',
-    },
-  };
+    };
 
-  // Add authentication token if available
-  const token = getToken();
-  if (token) {
-    options.headers['Authorization'] = `Bearer ${token}`;
+    const token = localStorage.getItem('token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    return headers;
   }
 
-  // Add request body for POST/PUT requests
-  if (data && (method === 'POST' || method === 'PUT')) {
-    options.body = JSON.stringify(data);
-  }
-
-  try {
-    const response = await fetch(url, options);
-    const responseData = await response.json().catch(() => ({}));
-
-    // Handle different response statuses
+  /**
+   * Handle API response
+   */
+  async handleResponse(response) {
+    const contentType = response.headers.get('content-type');
+    
     if (!response.ok) {
-      // Handle 401 Unauthorized - redirect to login
+      let errorMessage = 'An error occurred';
+      let errorDetails = null;
+      
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+          // Handle validation errors (422)
+          if (response.status === 422 && Array.isArray(errorData.detail)) {
+            errorDetails = errorData.detail;
+            errorMessage = errorData.detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+          }
+          // Handle single detail string
+          else if (typeof errorData.detail === 'string') {
+            errorMessage = errorData.detail;
+          }
+        } catch (parseError) {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || 'An error occurred';
+        }
+      } else {
+        try {
+          errorMessage = await response.text() || response.statusText || errorMessage;
+        } catch (textError) {
+          errorMessage = response.statusText || 'An error occurred';
+        }
+      }
+
+      const error = new Error(errorMessage);
+      error.status = response.status;
+      error.details = errorDetails;
+      
+      // Add specific error messages for common status codes
       if (response.status === 401) {
-        localStorage.removeItem('recompose_token');
+        error.message = 'Unauthorized. Please login again.';
+      } else if (response.status === 403) {
+        error.message = 'Access forbidden. You do not have permission to perform this action.';
+      } else if (response.status === 404) {
+        error.message = 'Resource not found.';
+      } else if (response.status === 429) {
+        error.message = errorMessage || 'Rate limit exceeded. Please try again later.';
+      } else if (response.status === 500) {
+        error.message = 'Server error. Please try again later.';
+      } else if (response.status === 503) {
+        error.message = 'Service unavailable. Please try again later.';
+      }
+      
+      throw error;
+    }
+
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    }
+
+    return await response.text();
+  }
+
+  /**
+   * Make GET request
+   */
+  async get(endpoint) {
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      if (error.status === 401) {
+        // Unauthorized - clear token and redirect to login
+        localStorage.removeItem('token');
         if (window.location.pathname !== '/login.html' && window.location.pathname !== '/frontend/login.html') {
           window.location.href = 'login.html';
         }
-        throw new Error('Authentication required. Please log in.');
       }
-
-      // Handle 403 Forbidden
-      if (response.status === 403) {
-        throw new Error(responseData.detail || 'Access forbidden. You do not have permission to perform this action.');
-      }
-
-      // Handle 429 Too Many Requests (rate limit)
-      if (response.status === 429) {
-        throw new Error(responseData.detail || 'Rate limit exceeded. Please try again later.');
-      }
-
-      // Handle 503 Service Unavailable
-      if (response.status === 503) {
-        throw new Error(responseData.detail || 'Service temporarily unavailable. Please try again later.');
-      }
-
-      // Handle validation errors (422)
-      if (response.status === 422) {
-        const errors = responseData.detail || [];
-        if (Array.isArray(errors) && errors.length > 0) {
-          const errorMessages = errors.map(err => err.msg || err.message || 'Validation error').join(', ');
-          throw new Error(errorMessages);
-        }
-        throw new Error(responseData.detail || 'Validation error');
-      }
-
-      // Generic error handling
-      throw new Error(responseData.detail || `Request failed: ${response.statusText}`);
-    }
-
-    return responseData;
-  } catch (error) {
-    // Re-throw API errors
-    if (error.message) {
       throw error;
     }
-    // Handle network errors
-    throw new Error('Network error. Please check your connection and try again.');
+  }
+
+  /**
+   * Make POST request
+   */
+  async post(endpoint, data) {
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data),
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      if (error.status === 401) {
+        localStorage.removeItem('token');
+        if (window.location.pathname !== '/login.html' && window.location.pathname !== '/frontend/login.html') {
+          window.location.href = 'login.html';
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Make PUT request
+   */
+  async put(endpoint, data) {
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(data),
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      if (error.status === 401) {
+        localStorage.removeItem('token');
+        if (window.location.pathname !== '/login.html' && window.location.pathname !== '/frontend/login.html') {
+          window.location.href = 'login.html';
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Make DELETE request
+   */
+  async delete(endpoint) {
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      return await this.handleResponse(response);
+    } catch (error) {
+      if (error.status === 401) {
+        localStorage.removeItem('token');
+        if (window.location.pathname !== '/login.html' && window.location.pathname !== '/frontend/login.html') {
+          window.location.href = 'login.html';
+        }
+      }
+      throw error;
+    }
+  }
+
+  // --- Rewrite API Methods ---
+  
+  /**
+   * Rewrite an email
+   */
+  async rewriteEmail(emailText, tone = 'professional') {
+    return await this.post('/api/rewrite', {
+      email_text: emailText,
+      tone: tone,
+    });
+  }
+
+  /**
+   * Get rewrite history/logs
+   */
+  async getRewriteLogs(limit = 20, offset = 0) {
+    return await this.get(`/api/rewrite/logs?limit=${limit}&offset=${offset}`);
+  }
+
+  /**
+   * Get usage statistics
+   */
+  async getUsageStats() {
+    return await this.get('/api/rewrite/usage');
+  }
+
+  // --- Contacts API Methods ---
+
+  /**
+   * Get all contacts
+   */
+  async getContacts(limit = 100, offset = 0, search = '') {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: offset.toString(),
+    });
+    if (search) {
+      params.append('search', search);
+    }
+    return await this.get(`/api/contacts?${params.toString()}`);
+  }
+
+  /**
+   * Create a new contact
+   */
+  async createContact(contactData) {
+    return await this.post('/api/contacts', contactData);
+  }
+
+  /**
+   * Update a contact
+   */
+  async updateContact(contactId, contactData) {
+    return await this.put(`/api/contacts/${contactId}`, contactData);
+  }
+
+  /**
+   * Delete a contact
+   */
+  async deleteContact(contactId) {
+    return await this.delete(`/api/contacts/${contactId}`);
+  }
+
+  // --- Campaigns API Methods ---
+
+  /**
+   * Get all campaigns
+   */
+  async getCampaigns(limit = 100, offset = 0) {
+    return await this.get(`/api/campaigns?limit=${limit}&offset=${offset}`);
+  }
+
+  /**
+   * Get campaign details
+   */
+  async getCampaign(campaignId) {
+    return await this.get(`/api/campaigns/${campaignId}`);
+  }
+
+  /**
+   * Create a new campaign
+   */
+  async createCampaign(campaignData) {
+    return await this.post('/api/campaigns', campaignData);
+  }
+
+  /**
+   * Update a campaign
+   */
+  async updateCampaign(campaignId, campaignData) {
+    return await this.put(`/api/campaigns/${campaignId}`, campaignData);
+  }
+
+  /**
+   * Delete a campaign
+   */
+  async deleteCampaign(campaignId) {
+    return await this.delete(`/api/campaigns/${campaignId}`);
+  }
+
+  /**
+   * Launch a campaign
+   */
+  async launchCampaign(campaignId) {
+    return await this.post(`/api/campaigns/${campaignId}/launch`, {});
+  }
+
+  /**
+   * Pause a campaign
+   */
+  async pauseCampaign(campaignId) {
+    return await this.post(`/api/campaigns/${campaignId}/pause`, {});
   }
 }
 
-/**
- * API Client object with convenience methods
- */
-const apiClient = {
-  /**
-   * GET request
-   * @param {string} endpoint - API endpoint
-   * @returns {Promise<object>} Response data
-   */
-  async get(endpoint) {
-    return apiRequest('GET', endpoint);
-  },
+// Create and export API client instance
+const apiClient = new ApiClient();
 
-  /**
-   * POST request
-   * @param {string} endpoint - API endpoint
-   * @param {object} data - Request body data
-   * @returns {Promise<object>} Response data
-   */
-  async post(endpoint, data) {
-    return apiRequest('POST', endpoint, data);
-  },
-
-  /**
-   * PUT request
-   * @param {string} endpoint - API endpoint
-   * @param {object} data - Request body data
-   * @returns {Promise<object>} Response data
-   */
-  async put(endpoint, data) {
-    return apiRequest('PUT', endpoint, data);
-  },
-
-  /**
-   * DELETE request
-   * @param {string} endpoint - API endpoint
-   * @returns {Promise<object>} Response data
-   */
-  async delete(endpoint) {
-    return apiRequest('DELETE', endpoint);
-  },
-
-  /**
-   * Get base URL
-   * @returns {string} Base URL
-   */
-  getBaseUrl() {
-    return API_BASE_URL;
-  },
-};
-
-// Export for use in other scripts
+// Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = apiClient;
 }
-

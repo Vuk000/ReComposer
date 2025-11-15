@@ -3,32 +3,86 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sign up for ReComposer and start improving your emails with AI-powered assistance and automated outreach campaigns.">
   <title>Sign Up – ReComposer</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
-  <div class="signup-container">
-    <div class="signup-header">
-      <h1>Get Started with ReComposer</h1>
-      <p>Sign up in seconds and start improving your emails immediately.</p>
+<body class="auth-page">
+  <div class="auth-container">
+    <div class="auth-header">
+      <a href="index.html" class="auth-logo" aria-label="ReComposer Home">ReComposer</a>
     </div>
-    <form class="signup-form" id="signupForm">
-      <label for="email">Email Address</label>
-      <input type="email" id="email" name="email" placeholder="you@example.com" required>
-      
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" placeholder="Create a password" required>
-      
-      <div id="planInfo" style="margin-top: 1rem; padding: 0.75rem; background: #f0f7ff; border-radius: 0.3rem; display: none;">
-        <strong>Selected Plan:</strong> <span id="planName"></span>
-      </div>
+    
+    <div class="auth-content">
+      <div class="signup-container">
+        <div class="signup-header">
+          <h1>Get Started with ReComposer</h1>
+          <p>Sign up in seconds and start improving your emails immediately.</p>
+        </div>
+        
+        <div id="planInfo" class="plan-info" style="display: none;">
+          <div class="plan-info-content">
+            <span class="plan-info-icon">✓</span>
+            <div>
+              <strong>Selected Plan:</strong>
+              <span id="planName"></span>
+            </div>
+          </div>
+        </div>
 
-      <button type="submit" id="submitBtn">Create Account</button>
-    </form>
-    <div class="small-note">By signing up, you agree to our <a href="#">Terms of Service</a>.</div>
-    <div class="alt-option">
-      Already have an account? <a href="login.html">Log in</a>
+        <form class="signup-form" id="signupForm" role="form" aria-label="Sign up form" novalidate>
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input 
+              type="email" 
+              id="email" 
+              name="email" 
+              placeholder="you@example.com" 
+              required 
+              aria-required="true" 
+              aria-label="Email address"
+              autocomplete="email">
+            <span class="error-message" id="email-error" role="alert"></span>
+          </div>
+          
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              placeholder="Create a password (min. 8 characters)" 
+              required 
+              aria-required="true" 
+              aria-label="Password"
+              autocomplete="new-password"
+              minlength="8">
+            <span class="error-message" id="password-error" role="alert"></span>
+            <small class="form-hint">Password must be at least 8 characters long</small>
+          </div>
+
+          <button type="submit" id="submitBtn" class="btn-primary" aria-label="Submit sign up form">
+            <span class="btn-text">Create Account</span>
+            <span class="btn-loader" style="display: none;">
+              <span class="spinner"></span>
+              Creating Account...
+            </span>
+          </button>
+        </form>
+        
+        <div class="auth-footer">
+          <div class="auth-terms">
+            <p>By signing up, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+          </div>
+          <div class="auth-divider">
+            <span>Already have an account?</span>
+          </div>
+          <div class="auth-signup">
+            <a href="login.html" class="auth-link-primary">Log in</a>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -48,33 +102,56 @@
     }
 
     // Form submission
-    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+    const signupForm = document.getElementById('signupForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = submitBtn.querySelector('.btn-text');
+    const btnLoader = submitBtn.querySelector('.btn-loader');
+
+    signupForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
-      const submitBtn = document.getElementById('submitBtn');
+      const emailError = document.getElementById('email-error');
+      const passwordError = document.getElementById('password-error');
 
       // Clear previous errors
       utils.clearFieldError(document.getElementById('email'));
       utils.clearFieldError(document.getElementById('password'));
+      emailError.textContent = '';
+      passwordError.textContent = '';
 
       // Validate email
+      if (!email) {
+        utils.showFieldError(document.getElementById('email'), 'Email is required');
+        emailError.textContent = 'Email is required';
+        return;
+      }
+
       if (!utils.validateEmail(email)) {
         utils.showFieldError(document.getElementById('email'), 'Please enter a valid email address');
+        emailError.textContent = 'Please enter a valid email address';
         return;
       }
 
       // Validate password
+      if (!password) {
+        utils.showFieldError(document.getElementById('password'), 'Password is required');
+        passwordError.textContent = 'Password is required';
+        return;
+      }
+
       const passwordValidation = utils.validatePassword(password);
       if (!passwordValidation.isValid) {
         utils.showFieldError(document.getElementById('password'), passwordValidation.message);
+        passwordError.textContent = passwordValidation.message;
         return;
       }
 
       // Disable button and show loading
-      utils.disableButton(submitBtn);
-      submitBtn.textContent = 'Creating Account...';
+      submitBtn.disabled = true;
+      btnText.style.display = 'none';
+      btnLoader.style.display = 'flex';
 
       try {
         // Sign up
@@ -88,14 +165,18 @@
           email: email,
           password: password
         });
-        authUtils.setToken(loginResponse.access_token);
+
+        if (typeof authUtils !== 'undefined') {
+          authUtils.setToken(loginResponse.access_token);
+        } else {
+          localStorage.setItem('token', loginResponse.access_token);
+        }
 
         utils.showToast('Account created successfully!', 'success');
 
         // Redirect to dashboard or billing if plan selected
         setTimeout(() => {
           if (plan === 'standard' || plan === 'pro') {
-            // Redirect to dashboard, where user can subscribe to plan
             window.location.href = 'dashboard.html?plan=' + plan;
           } else {
             window.location.href = 'dashboard.html';
@@ -103,16 +184,21 @@
         }, 1000);
 
       } catch (error) {
-        utils.enableButton(submitBtn);
-        submitBtn.textContent = 'Create Account';
-        utils.showToast(error.message || 'Failed to create account. Please try again.', 'error');
+        submitBtn.disabled = false;
+        btnText.style.display = 'inline';
+        btnLoader.style.display = 'none';
+
+        const errorMessage = error.message || 'Failed to create account. Please try again.';
+        utils.showToast(errorMessage, 'error');
 
         // Show field-specific errors if available
-        if (error.message.includes('email')) {
-          utils.showFieldError(document.getElementById('email'), error.message);
+        if (errorMessage.toLowerCase().includes('email')) {
+          utils.showFieldError(document.getElementById('email'), errorMessage);
+          emailError.textContent = errorMessage;
         }
-        if (error.message.includes('password')) {
-          utils.showFieldError(document.getElementById('password'), error.message);
+        if (errorMessage.toLowerCase().includes('password')) {
+          utils.showFieldError(document.getElementById('password'), errorMessage);
+          passwordError.textContent = errorMessage;
         }
       }
     });
@@ -121,8 +207,10 @@
     document.getElementById('email').addEventListener('blur', function() {
       if (this.value && !utils.validateEmail(this.value)) {
         utils.showFieldError(this, 'Please enter a valid email address');
+        document.getElementById('email-error').textContent = 'Please enter a valid email address';
       } else {
         utils.clearFieldError(this);
+        document.getElementById('email-error').textContent = '';
       }
     });
 
@@ -131,12 +219,13 @@
         const validation = utils.validatePassword(this.value);
         if (!validation.isValid) {
           utils.showFieldError(this, validation.message);
+          document.getElementById('password-error').textContent = validation.message;
         } else {
           utils.clearFieldError(this);
+          document.getElementById('password-error').textContent = '';
         }
       }
     });
   </script>
 </body>
 </html>
-

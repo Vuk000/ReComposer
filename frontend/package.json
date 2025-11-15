@@ -1,0 +1,13 @@
+{
+  "name": "recomposer-frontend",
+  "version": "1.0.0",
+  "description": "ReComposer Frontend - Static HTML/CSS/JS",
+  "scripts": {
+    "dev": "npx http-server . -p 3000 -o",
+    "serve": "npx http-server . -p 3000"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
+
