@@ -3,7 +3,7 @@
 Authentication endpoints for user signup and login.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,12 +18,16 @@ from app.core.security import (
     create_access_token,
     decode_access_token,
 )
+import logging
 
 # --- Router Setup ---
-router = APIRouter(prefix="/auth", tags=["authentication"])
+router = APIRouter(prefix="/api/auth", tags=["authentication"])
+
+# --- Logger ---
+logger = logging.getLogger(__name__)
 
 # --- OAuth2 Scheme ---
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 
 # --- Pydantic Models ---
@@ -118,7 +122,7 @@ async def get_current_user(
 
 
 # --- Signup Endpoint ---
-@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def signup(request: Request, user_data: UserSignup, db: AsyncSession = Depends(get_db)):
     """
     Create a new user account.
@@ -156,7 +160,17 @@ async def signup(request: Request, user_data: UserSignup, db: AsyncSession = Dep
     await db.commit()
     await db.refresh(new_user)
     
-    return new_user
+    logger.info(
+        f"User {new_user.id} signed up successfully",
+        extra={"request_id": getattr(request.state, "request_id", "unknown")}
+    )
+    
+    # Create and return access token
+    access_token = create_access_token(data={"sub": str(new_user.id)})
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 # --- Login Endpoint ---
@@ -212,3 +226,152 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
     """
     return current_user
 
+
+# --- Password Reset Endpoints ---
+class ForgotPasswordRequest(BaseModel):
+    """Forgot password request model."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset password request model."""
+    token: str
+    password: str = Field(..., min_length=8, max_length=128)
+    
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
+        """Validate password strength."""
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if len(v) > 128:
+            raise ValueError("Password must be at most 128 characters long")
+        has_letter = any(c.isalpha() for c in v)
+        has_number = any(c.isdigit() for c in v)
+        if not (has_letter and has_number):
+            raise ValueError("Password must contain at least one letter and one number")
+        return v
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    request: Request,
+    forgot_data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Request password reset email.
+    
+    Args:
+        request: FastAPI request object
+        forgot_data: Email address for password reset
+        db: Database session
+        
+    Returns:
+        Success message (always returns success to prevent email enumeration)
+    """
+    from datetime import timedelta
+    import secrets
+    
+    # Find user by email
+    result = await db.execute(select(User).where(User.email == forgot_data.email))
+    user = result.scalar_one_or_none()
+    
+    if user:
+        # Generate reset token
+        reset_token = secrets.token_urlsafe(32)
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)  # Token valid for 1 hour
+        
+        user.password_reset_token = reset_token
+        user.password_reset_expires = expires_at
+        await db.commit()
+        
+        # Send reset email via Brevo (if configured)
+        if settings.BREVO_API_KEY:
+            try:
+                from app.services.email.brevo_service import send_via_brevo_api
+                from app.models.email_account import EmailAccount, EmailProvider
+                
+                # Create a temporary email account for sending
+                temp_account = EmailAccount(
+                    provider=EmailProvider.BREVO,
+                    email_address=settings.BREVO_SMTP_USERNAME or "noreply@recompose.ai",
+                    user_id=user.id
+                )
+                
+                reset_url = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+                email_body = f"""
+Hello,
+
+You requested a password reset for your ReCompose account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you didn't request this, please ignore this email.
+
+Best regards,
+ReCompose Team
+"""
+                
+                await send_via_brevo_api(
+                    email_account=temp_account,
+                    to_email=user.email,
+                    to_name="",
+                    subject="Reset Your ReCompose Password",
+                    body=email_body,
+                    html_body=email_body.replace('\n', '<br>\n')
+                )
+            except Exception as e:
+                logger.error(f"Error sending password reset email: {str(e)}", exc_info=True)
+                # Continue even if email fails
+    
+    # Always return success to prevent email enumeration
+    return {"message": "If an account with that email exists, a password reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: Request,
+    reset_data: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reset password using reset token.
+    
+    Args:
+        request: FastAPI request object
+        reset_data: Reset token and new password
+        db: Database session
+        
+    Returns:
+        Success message
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Find user by reset token
+    result = await db.execute(
+        select(User).where(
+            User.password_reset_token == reset_data.token,
+            User.password_reset_expires > now
+        )
+    )
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token"
+        )
+    
+    # Update password
+    user.hashed_password = get_password_hash(reset_data.password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    await db.commit()
+    
+    logger.info(f"User {user.id} reset password successfully")
+    
+    return {"message": "Password reset successfully"}

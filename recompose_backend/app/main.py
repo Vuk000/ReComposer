@@ -17,7 +17,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.routers import auth, rewrite, billing
-from app.routers import contacts, campaigns, generate, tracking
+from app.routers import contacts, campaigns, generate, tracking, user_settings, brevo_webhook, analytics
 
 
 # --- Structured JSON Log Formatter ---
@@ -101,13 +101,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # --- Middleware Setup ---
 from app.core.middleware import SecurityHeadersMiddleware, RequestIDMiddleware, RequestSizeLimitMiddleware
-from app.core.rate_limit import RateLimitMiddleware
+from app.core.rate_limit import RateLimitMiddleware as RateLimitMiddlewareImpl
 
 # Add middleware in order: RequestID -> RequestSizeLimit -> RateLimit -> SecurityHeaders
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(RequestSizeLimitMiddleware)
 # Rate limiting middleware is always added but checks settings.RATE_LIMIT_ENABLED internally
-app.add_middleware(RateLimitMiddleware, limiter=limiter)
+app.add_middleware(RateLimitMiddlewareImpl, limiter=limiter)
 app.add_middleware(SecurityHeadersMiddleware)
 
 # --- CORS Middleware ---
@@ -191,26 +191,46 @@ async def health_check():
     from app.db import engine
     from sqlalchemy import text
     
+    health_status = {
+        "status": "healthy",
+        "version": settings.APP_VERSION,
+        "database": "unknown",
+        "openai": "unknown",
+        "redis": "unknown"
+    }
+    is_healthy = True
+    
+    # Check database connectivity
     try:
-        # Check database connectivity
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-        db_status = "connected"
-        is_healthy = True
+        health_status["database"] = "connected"
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
-        db_status = "disconnected"
+        health_status["database"] = "disconnected"
         is_healthy = False
+    
+    # Check OpenAI API key (if configured)
+    if settings.OPENAI_API_KEY:
+        health_status["openai"] = "configured"
+    else:
+        health_status["openai"] = "not_configured"
+    
+    # Check Redis/Celery (optional, don't fail health check)
+    try:
+        import redis
+        redis_client = redis.from_url(settings.CELERY_BROKER_URL, socket_connect_timeout=1)
+        redis_client.ping()
+        health_status["redis"] = "connected"
+    except Exception:
+        health_status["redis"] = "not_available"
+        # Redis is optional, don't fail health check
     
     status_code = status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
     
     return JSONResponse(
         status_code=status_code,
-        content={
-            "status": "healthy" if is_healthy else "unhealthy",
-            "version": settings.APP_VERSION,
-            "database": db_status
-        }
+        content=health_status
     )
 
 
@@ -222,6 +242,9 @@ app.include_router(contacts.router)
 app.include_router(campaigns.router)
 app.include_router(generate.router)
 app.include_router(tracking.router)
+app.include_router(brevo_webhook.router)
+app.include_router(analytics.router)
+app.include_router(user_settings.router)
 
 
 # --- Root Endpoint ---

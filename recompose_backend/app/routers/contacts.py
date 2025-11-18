@@ -124,18 +124,29 @@ async def create_contact(
             detail=f"Contact with email {contact_data.email} already exists"
         )
     
-    # Create contact
-    contact = Contact(
-        user_id=current_user.id,
-        name=contact_data.name,
-        email=contact_data.email.lower(),
-        company=contact_data.company,
-        notes=contact_data.notes
-    )
-    
-    db.add(contact)
-    await db.commit()
-    await db.refresh(contact)
+    # Create contact with error handling for race conditions
+    try:
+        contact = Contact(
+            user_id=current_user.id,
+            name=contact_data.name,
+            email=contact_data.email.lower(),
+            company=contact_data.company,
+            notes=contact_data.notes
+        )
+        
+        db.add(contact)
+        await db.commit()
+        await db.refresh(contact)
+    except Exception as e:
+        await db.rollback()
+        # Check if it's a unique constraint violation
+        error_str = str(e).lower()
+        if 'unique' in error_str or 'duplicate' in error_str:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Contact with email {contact_data.email} already exists"
+            )
+        raise
     
     logger.info(
         f"User {current_user.id} created contact {contact.id}",

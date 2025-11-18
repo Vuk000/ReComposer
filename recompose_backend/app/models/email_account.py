@@ -15,6 +15,7 @@ class EmailProvider(str, enum.Enum):
     GMAIL = "gmail"
     OUTLOOK = "outlook"
     SMTP = "smtp"
+    BREVO = "brevo"
 
 
 class EmailAccount(Base):

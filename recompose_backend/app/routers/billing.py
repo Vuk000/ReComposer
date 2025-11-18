@@ -17,7 +17,7 @@ from app.config import settings
 from app.db import get_db
 
 # --- Router Setup ---
-router = APIRouter(prefix="/billing", tags=["billing"])
+router = APIRouter(prefix="/api/billing", tags=["billing"])
 
 # --- Logger ---
 logger = logging.getLogger(__name__)
@@ -57,6 +57,25 @@ class CancelResponse(BaseModel):
     status: str
 
 
+class CreateCheckoutRequest(BaseModel):
+    """Create checkout session request model."""
+    plan: str  # "standard" or "pro"
+    interval: str = "month"  # "month" or "year"
+    success_url: Optional[str] = None  # URL to redirect after success
+    cancel_url: Optional[str] = None  # URL to redirect after cancel
+
+
+class CreateCheckoutResponse(BaseModel):
+    """Create checkout session response model."""
+    checkout_url: str
+    session_id: str
+
+
+class CreatePortalResponse(BaseModel):
+    """Create customer portal session response model."""
+    portal_url: str
+
+
 # --- Helper Functions ---
 async def get_or_create_stripe_customer(user: User) -> str:
     """
@@ -85,27 +104,212 @@ async def get_or_create_stripe_customer(user: User) -> str:
     return customer.id
 
 
-def get_stripe_price_id(plan: str) -> str:
+def get_stripe_lookup_key(plan: str, interval: str = "month") -> str:
     """
-    Get Stripe price ID for plan.
+    Get Stripe lookup key for plan and interval.
     
     Args:
         plan: Plan name (standard, pro)
+        interval: Billing interval (month, year)
         
     Returns:
-        Stripe price ID
+        Stripe lookup key
+        
+    Raises:
+        ValueError: If lookup key is not configured for the plan/interval
     """
-    price_map = {
-        "standard": settings.STRIPE_STANDARD_PRICE_ID if hasattr(settings, 'STRIPE_STANDARD_PRICE_ID') and settings.STRIPE_STANDARD_PRICE_ID else None,
-        "pro": settings.STRIPE_PRO_PRICE_ID if hasattr(settings, 'STRIPE_PRO_PRICE_ID') and settings.STRIPE_PRO_PRICE_ID else None,
-    }
+    try:
+        if interval == "year":
+            lookup_map = {
+                "standard": getattr(settings, 'STRIPE_STANDARD_YEARLY_LOOKUP_KEY', None),
+                "pro": getattr(settings, 'STRIPE_PRO_YEARLY_LOOKUP_KEY', None),
+            }
+        else:
+            lookup_map = {
+                "standard": getattr(settings, 'STRIPE_STANDARD_MONTHLY_LOOKUP_KEY', None),
+                "pro": getattr(settings, 'STRIPE_PRO_MONTHLY_LOOKUP_KEY', None),
+            }
+        
+        lookup_key = lookup_map.get(plan)
+        if not lookup_key:
+            raise ValueError(f"Lookup key not configured for plan: {plan}, interval: {interval}. Please set STRIPE_{plan.upper()}_{interval.upper()}_LOOKUP_KEY in environment variables.")
+        
+        return lookup_key
+    except AttributeError as e:
+        raise ValueError(f"Lookup key configuration error: {str(e)}")
+
+
+# --- Create Checkout Session Endpoint ---
+@router.post("/create-checkout", response_model=CreateCheckoutResponse)
+async def create_checkout_session(
+    request: Request,
+    checkout_request: CreateCheckoutRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a Stripe checkout session for subscription.
     
-    price_id = price_map.get(plan)
-    if not price_id:
-        # Fallback: use plan name (requires Stripe products to be set up)
-        raise ValueError(f"Price ID not configured for plan: {plan}")
+    Args:
+        request: FastAPI request object
+        checkout_request: Checkout session request with plan and interval
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Checkout session URL
+    """
+    if not settings.BILLING_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing endpoints are currently disabled."
+        )
     
-    return price_id
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe is not configured."
+        )
+    
+    valid_plans = ["standard", "pro"]
+    valid_intervals = ["month", "year"]
+    
+    if checkout_request.plan not in valid_plans:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Plan must be one of: {', '.join(valid_plans)}"
+        )
+    
+    if checkout_request.interval not in valid_intervals:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Interval must be one of: {', '.join(valid_intervals)}"
+        )
+    
+    try:
+        # Get or create Stripe customer
+        customer_id = await get_or_create_stripe_customer(current_user)
+        
+        # Get lookup key
+        try:
+            lookup_key = get_stripe_lookup_key(checkout_request.plan, checkout_request.interval)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Lookup key not configured for plan {checkout_request.plan} ({checkout_request.interval})"
+            )
+        
+        # Set success and cancel URLs
+        success_url = checkout_request.success_url or f"{settings.FRONTEND_URL}/app/dashboard?checkout=success"
+        cancel_url = checkout_request.cancel_url or f"{settings.FRONTEND_URL}/?checkout=cancelled"
+        
+        # Create checkout session using lookup key
+        checkout_session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{
+                "price_lookup_key": lookup_key,
+                "quantity": 1,
+            }],
+            mode="subscription",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "user_id": str(current_user.id),
+                "plan": checkout_request.plan,
+                "interval": checkout_request.interval
+            },
+            allow_promotion_codes=True,
+        )
+        
+        logger.info(
+            f"Created checkout session for user {current_user.id}, plan={checkout_request.plan}, interval={checkout_request.interval}",
+            extra={"request_id": getattr(request.state, "request_id", "unknown")}
+        )
+        
+        return {
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id
+        }
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating checkout session: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe error: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create checkout session."
+        )
+
+
+# --- Create Customer Portal Session Endpoint ---
+@router.post("/customer-portal", response_model=CreatePortalResponse)
+async def create_customer_portal_session(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a Stripe customer portal session for managing subscription.
+    
+    Args:
+        request: FastAPI request object
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Customer portal session URL
+    """
+    if not settings.BILLING_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Billing endpoints are currently disabled."
+        )
+    
+    if not settings.STRIPE_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe is not configured."
+        )
+    
+    if not current_user.stripe_customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No Stripe customer found. Please subscribe first."
+        )
+    
+    try:
+        # Create portal session
+        portal_session = stripe.billing_portal.Session.create(
+            customer=current_user.stripe_customer_id,
+            return_url=f"{settings.FRONTEND_URL}/settings",
+        )
+        
+        logger.info(
+            f"Created customer portal session for user {current_user.id}",
+            extra={"request_id": getattr(request.state, "request_id", "unknown")}
+        )
+        
+        return {
+            "portal_url": portal_session.url
+        }
+        
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating portal session: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe error: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Error creating portal session: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create portal session."
+        )
 
 
 # --- Subscribe Endpoint ---
@@ -153,14 +357,12 @@ async def subscribe(
         # Get or create Stripe customer
         customer_id = await get_or_create_stripe_customer(current_user)
         
-        # Get price ID for plan
+        # Get lookup key for plan (default to monthly)
         try:
-            price_id = get_stripe_price_id(subscribe_request.plan)
+            lookup_key = get_stripe_lookup_key(subscribe_request.plan, "month")
         except ValueError:
-            # For MVP, if price IDs aren't configured, we'll create subscription with plan name
-            # In production, this should be properly configured
-            logger.warning(f"Price ID not configured for plan {subscribe_request.plan}, using plan name")
-            # Create a subscription with metadata instead
+            # Fallback: if lookup keys aren't configured, create subscription with price_data
+            logger.warning(f"Lookup key not configured for plan {subscribe_request.plan}, using price_data")
             subscription = stripe.Subscription.create(
                 customer=customer_id,
                 items=[{
@@ -178,10 +380,10 @@ async def subscribe(
                 metadata={"user_id": str(current_user.id), "plan": subscribe_request.plan}
             )
         else:
-            # Create subscription with price ID
+            # Create subscription with lookup key
             subscription = stripe.Subscription.create(
                 customer=customer_id,
-                items=[{"price": price_id}],
+                items=[{"price_lookup_key": lookup_key}],
                 metadata={"user_id": str(current_user.id), "plan": subscribe_request.plan}
             )
         
@@ -265,9 +467,11 @@ async def get_subscription_status(
     Returns:
         Subscription status information
     """
+    # Return only plan and status to match frontend expectations
+    # Frontend can get full details from user profile if needed
     return {
-        "plan": current_user.subscription_plan,
-        "status": current_user.subscription_status,
+        "plan": current_user.subscription_plan or "standard",
+        "status": current_user.subscription_status or "active",
         "customer_id": current_user.stripe_customer_id,
         "subscription_id": current_user.stripe_subscription_id
     }
@@ -396,7 +600,44 @@ async def stripe_webhook(
     event_data = event["data"]["object"]
     
     try:
-        if event_type == "customer.subscription.created":
+        if event_type == "checkout.session.completed":
+            # Handle successful checkout completion
+            session = event_data
+            customer_id = session.get("customer")
+            subscription_id = session.get("subscription")
+            metadata = session.get("metadata", {})
+            plan = metadata.get("plan", "standard")
+            
+            # Find user by customer ID or metadata
+            from sqlalchemy import select
+            from app.models.user import User
+            user = None
+            if customer_id:
+                result = await db.execute(
+                    select(User).where(User.stripe_customer_id == customer_id)
+                )
+                user = result.scalar_one_or_none()
+            elif "user_id" in metadata:
+                result = await db.execute(
+                    select(User).where(User.id == int(metadata["user_id"]))
+                )
+                user = result.scalar_one_or_none()
+            
+            if user:
+                try:
+                    user.stripe_customer_id = customer_id or user.stripe_customer_id
+                    if subscription_id:
+                        user.stripe_subscription_id = subscription_id
+                    user.subscription_plan = plan
+                    user.subscription_status = "active"
+                    await db.commit()
+                    logger.info(f"Updated user {user.id} from checkout.session.completed webhook, plan={plan}")
+                except Exception as e:
+                    await db.rollback()
+                    logger.error(f"Error updating user {user.id} from checkout.session.completed webhook: {str(e)}", exc_info=True)
+                    raise
+        
+        elif event_type == "customer.subscription.created":
             subscription_id = event_data["id"]
             customer_id = event_data["customer"]
             plan_metadata = event_data.get("metadata", {}).get("plan", "standard")

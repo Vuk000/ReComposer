@@ -5,13 +5,16 @@ import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
 import { useAuth } from '@/hooks/useAuth'
 import { Github, Lock } from 'lucide-react'
+import api from '@/lib/api'
 
 const Signup = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+  const [loading, setLoading] = useState(false)
   const [searchParams] = useSearchParams()
   const plan = searchParams.get('plan')
+  const billing = searchParams.get('billing') || 'monthly'
   const { signup } = useAuth()
 
   const validate = () => {
@@ -34,10 +37,44 @@ const Signup = () => {
     e.preventDefault()
     if (!validate()) return
 
+    setLoading(true)
     try {
-      await signup(email, password)
-    } catch (error: any) {
-      setErrors({ email: error.response?.data?.detail || 'Failed to create account' })
+      // Sign up directly (don't use signup function to avoid auto-navigation)
+      await api.post('/api/auth/signup', { email, password })
+      
+      // Login to get token
+      const loginResponse = await api.post<{ access_token: string }>('/api/auth/login', { email, password })
+      localStorage.setItem('token', loginResponse.data.access_token)
+      
+      // If plan is selected, create checkout session
+      if (plan && (plan === 'standard' || plan === 'pro')) {
+        try {
+          const interval = billing === 'yearly' ? 'year' : 'month'
+          const response = await api.post<{ checkout_url: string }>('/api/billing/create-checkout', {
+            plan,
+            interval,
+          })
+          
+          // Redirect to Stripe checkout
+          window.location.href = response.data.checkout_url
+          return
+        } catch (checkoutError) {
+          console.error('Failed to create checkout session:', checkoutError)
+          const err = checkoutError as { response?: { data?: { detail?: string } }; message?: string }
+          setErrors({ email: err.response?.data?.detail || err.message || 'Failed to create checkout session. You can upgrade later in settings.' })
+          // Still redirect to dashboard if checkout fails
+          window.location.href = '/app/dashboard'
+          return
+        }
+      } else {
+        // No plan selected, redirect to dashboard
+        window.location.href = '/app/dashboard'
+      }
+    } catch (error) {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string }
+      setErrors({ email: err.response?.data?.detail || err.message || 'Failed to create account' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -56,7 +93,11 @@ const Signup = () => {
 
       {plan && (
         <div className="mb-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm">
-          Selected Plan: <span className="font-semibold">{plan === 'pro' ? 'Pro ($49.99/mo)' : 'Standard ($14.99/mo)'}</span>
+          Selected Plan: <span className="font-semibold">
+            {plan === 'pro' 
+              ? `Pro (${billing === 'yearly' ? '$479.90/year' : '$49.99/month'})` 
+              : `Standard (${billing === 'yearly' ? '$143.90/year' : '$14.99/month'})`}
+          </span>
         </div>
       )}
 
@@ -83,8 +124,8 @@ const Signup = () => {
           {errors.password && <p className="mt-1 text-sm text-destructive">{errors.password}</p>}
         </div>
 
-        <Button type="submit" className="w-full">
-          Sign In with Email
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Creating account...' : plan ? 'Sign Up & Continue to Payment' : 'Sign Up'}
         </Button>
       </form>
 

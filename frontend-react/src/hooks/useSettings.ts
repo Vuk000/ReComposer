@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '@/lib/api'
 import { Settings, BillingStatus } from '@/types/api'
+import { AxiosErrorResponse } from '@/types/errors'
 
 export const useSettings = () => {
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -10,13 +11,16 @@ export const useSettings = () => {
   const fetchSettings = async () => {
     setLoading(true)
     try {
-      // Placeholder - implement when endpoint exists
-      // const response = await api.get<Settings>('/api/user/settings')
-      // setSettings(response.data)
-      setSettings({ default_tone: 'professional', style_learning: false })
+      const response = await api.get<Settings>('/api/user/settings')
+      setSettings(response.data)
     } catch (err) {
       // Fallback to defaults
-      setSettings({ default_tone: 'professional', style_learning: false })
+      setSettings({ 
+        default_tone: 'professional', 
+        style_learning_enabled: false,
+        email_notifications: true,
+        marketing_emails: false
+      })
     } finally {
       setLoading(false)
     }
@@ -24,25 +28,38 @@ export const useSettings = () => {
 
   const fetchBilling = async () => {
     try {
-      const response = await api.get<BillingStatus>('/billing/status')
+      const response = await api.get<BillingStatus>('/api/billing/status')
       setBilling(response.data)
     } catch (err) {
-      // Fallback
+      // Show error but use fallback
+      const error = err as AxiosErrorResponse
+      console.error('Failed to fetch billing status:', error.response?.data?.detail || error.message)
       setBilling({ plan: 'standard', status: 'active' })
     }
   }
 
   useEffect(() => {
-    fetchSettings()
-    fetchBilling()
+    let isMounted = true
+    
+    const loadData = async () => {
+      if (isMounted) {
+        await fetchSettings()
+        await fetchBilling()
+      }
+    }
+    
+    loadData()
+    
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   const updateSettings = async (data: Partial<Settings>): Promise<boolean> => {
     setLoading(true)
     try {
-      // Placeholder - implement when endpoint exists
-      // await api.put('/api/user/settings', data)
-      setSettings((prev) => (prev ? { ...prev, ...data } : null))
+      const response = await api.put<Settings>('/api/user/settings', data)
+      setSettings(response.data)
       return true
     } catch (err) {
       return false

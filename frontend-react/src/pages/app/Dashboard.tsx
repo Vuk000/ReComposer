@@ -1,11 +1,28 @@
+import { useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import Chart from '@/components/ui/Chart'
 import Calendar from '@/components/ui/Calendar'
 import Tooltip from '@/components/ui/Tooltip'
 import Progress from '@/components/ui/Progress'
+import { useToast } from '@/contexts/ToastContext'
 import { TrendingUp, TrendingDown, Users, DollarSign, HelpCircle, BarChart3 } from 'lucide-react'
 
 const Dashboard = () => {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { showToast } = useToast()
+
+  useEffect(() => {
+    // Handle checkout success redirect
+    if (searchParams.get('checkout') === 'success') {
+      showToast('Subscription activated successfully! Welcome to ReCompose.', 'success')
+      // Clean up URL parameter
+      setSearchParams((params) => {
+        params.delete('checkout')
+        return params
+      })
+    }
+  }, [searchParams, setSearchParams, showToast])
   const revenueData = [
     { value: 1200 },
     { value: 1900 },

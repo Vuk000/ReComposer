@@ -29,9 +29,11 @@ const Campaigns = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Only send name and description for now (email steps can be added later)
     const result = await createCampaign({
       name: formData.name,
       description: formData.description,
+      // contact_ids and email_steps can be added in a future update
     })
     if (result) {
       setShowModal(false)

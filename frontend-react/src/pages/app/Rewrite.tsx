@@ -41,10 +41,27 @@ const Rewrite = () => {
 
   const handleCopy = async () => {
     if (rewrittenEmail) {
-      await navigator.clipboard.writeText(rewrittenEmail)
-      setCopied(true)
-      showToast('Copied to clipboard!', 'success')
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        // Try modern clipboard API first
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(rewrittenEmail)
+        } else {
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea')
+          textArea.value = rewrittenEmail
+          textArea.style.position = 'fixed'
+          textArea.style.left = '-999999px'
+          document.body.appendChild(textArea)
+          textArea.select()
+          document.execCommand('copy')
+          document.body.removeChild(textArea)
+        }
+        setCopied(true)
+        showToast('Copied to clipboard!', 'success')
+        setTimeout(() => setCopied(false), 2000)
+      } catch (err) {
+        showToast('Failed to copy to clipboard', 'error')
+      }
     }
   }
 

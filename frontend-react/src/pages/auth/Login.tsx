@@ -30,8 +30,9 @@ const Login = () => {
 
     try {
       await login(email, password)
-    } catch (error: any) {
-      setErrors({ email: error.response?.data?.detail || 'Invalid credentials' })
+    } catch (error) {
+      const err = error as { response?: { data?: { detail?: string } }; message?: string }
+      setErrors({ email: err.response?.data?.detail || err.message || 'Invalid credentials' })
     }
   }
 

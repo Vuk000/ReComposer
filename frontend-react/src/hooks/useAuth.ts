@@ -8,18 +8,9 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      fetchUser()
-    } else {
-      setLoading(false)
-    }
-  }, [])
-
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     try {
-      const response = await api.get<User>('/auth/me')
+      const response = await api.get<User>('/api/auth/me')
       setUser(response.data)
     } catch (error) {
       localStorage.removeItem('token')
@@ -27,15 +18,25 @@ export const useAuth = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetchUser()
+    } else {
+      setLoading(false)
+    }
+  }, [fetchUser])
+
 
   const signup = async (email: string, password: string) => {
-    await api.post('/auth/signup', { email, password })
+    await api.post('/api/auth/signup', { email, password })
     return login(email, password)
   }
 
   const login = async (email: string, password: string) => {
-    const response = await api.post<AuthResponse>('/auth/login', { email, password })
+    const response = await api.post<AuthResponse>('/api/auth/login', { email, password })
     localStorage.setItem('token', response.data.access_token)
     await fetchUser()
     navigate('/app/dashboard')
@@ -44,7 +45,8 @@ export const useAuth = () => {
   const logout = useCallback(() => {
     localStorage.removeItem('token')
     setUser(null)
-  }, [])
+    navigate('/login')
+  }, [navigate])
 
   return { user, loading, signup, login, logout, fetchUser }
 }

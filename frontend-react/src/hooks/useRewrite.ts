@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import api from '@/lib/api'
 import { RewriteRequest, RewriteResponse, UsageStats } from '@/types/api'
+import { AxiosErrorResponse } from '@/types/errors'
 
 export const useRewrite = () => {
   const [loading, setLoading] = useState(false)
@@ -12,8 +13,9 @@ export const useRewrite = () => {
     try {
       const response = await api.post<RewriteResponse>('/api/rewrite', request)
       return response.data
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to rewrite email')
+    } catch (err) {
+      const error = err as AxiosErrorResponse
+      setError(error.response?.data?.detail || 'Failed to rewrite email')
       return null
     } finally {
       setLoading(false)

@@ -22,10 +22,12 @@ router = APIRouter(prefix="/api/generate-email", tags=["generate"])
 logger = logging.getLogger(__name__)
 
 # --- OpenAI Client ---
-openai_client = AsyncOpenAI(
-    api_key=settings.OPENAI_API_KEY,
-    timeout=settings.OPENAI_TIMEOUT
-)
+openai_client = None
+if settings.OPENAI_API_KEY:
+    openai_client = AsyncOpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        timeout=settings.OPENAI_TIMEOUT
+    )
 
 
 # --- Pydantic Models ---
@@ -84,7 +86,7 @@ async def generate_email(
         )
     
     # Validate OpenAI API key
-    if not settings.OPENAI_API_KEY:
+    if not settings.OPENAI_API_KEY or not openai_client:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="OpenAI API key is not configured"

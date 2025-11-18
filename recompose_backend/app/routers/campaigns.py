@@ -17,7 +17,6 @@ from app.models.campaign_recipient import CampaignRecipient, RecipientStatus
 from app.models.contact import Contact
 from app.routers.auth import get_current_user
 from app.config import settings
-from app.tasks.email_tasks import send_campaign_email
 import logging
 import uuid
 
@@ -26,6 +25,14 @@ router = APIRouter(prefix="/api/campaigns", tags=["campaigns"])
 
 # --- Logger ---
 logger = logging.getLogger(__name__)
+
+# Try to import Celery tasks, but handle gracefully if Celery is not available
+try:
+    from app.tasks.email_tasks import send_campaign_email
+    CELERY_AVAILABLE = True
+except (ImportError, AttributeError) as e:
+    CELERY_AVAILABLE = False
+    logger.warning(f"Celery tasks not available: {str(e)}. Campaign emails will not be sent automatically.")
 
 
 # --- Pydantic Models ---
@@ -42,20 +49,28 @@ class CampaignCreate(BaseModel):
     """Campaign creation request model."""
     name: str = Field(..., min_length=1, max_length=255, description="Campaign name")
     description: Optional[str] = Field(None, max_length=5000, description="Campaign description")
-    contact_ids: List[int] = Field(..., min_length=1, description="List of contact IDs to include")
-    email_steps: List[EmailStepCreate] = Field(..., min_length=1, description="Email steps in sequence")
+    contact_ids: Optional[List[int]] = Field(None, min_length=1, description="List of contact IDs to include (optional for draft)")
+    email_steps: Optional[List[EmailStepCreate]] = Field(None, min_length=1, description="Email steps in sequence (optional for draft)")
     
     @field_validator("email_steps")
     @classmethod
-    def validate_steps(cls, v: List[EmailStepCreate]) -> List[EmailStepCreate]:
+    def validate_steps(cls, v: Optional[List[EmailStepCreate]]) -> Optional[List[EmailStepCreate]]:
         """Validate step numbers are sequential starting from 1."""
+        if v is None or len(v) == 0:
+            return None
         step_numbers = [step.step_number for step in v]
         if len(step_numbers) != len(set(step_numbers)):
             raise ValueError("Step numbers must be unique")
         if min(step_numbers) != 1:
             raise ValueError("Step numbers must start from 1")
         if max(step_numbers) != len(step_numbers):
-            raise ValueError("Step numbers must be sequential")
+            raise ValueError("Step numbers must be sequential (no gaps allowed)")
+        # Validate delay values are reasonable
+        for step in v:
+            if step.delay_days < 0:
+                raise ValueError("delay_days must be non-negative")
+            if step.delay_hours < 0 or step.delay_hours > 23:
+                raise ValueError("delay_hours must be between 0 and 23")
         return sorted(v, key=lambda x: x.step_number)
 
 
@@ -84,12 +99,12 @@ class CampaignResponse(BaseModel):
     
     id: int
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: CampaignStatus
     created_at: datetime
-    launched_at: Optional[datetime]
-    paused_at: Optional[datetime]
-    email_steps: List[CampaignEmailResponse]
+    launched_at: Optional[datetime] = None
+    paused_at: Optional[datetime] = None
+    email_steps: Optional[List[CampaignEmailResponse]] = None  # Optional for drafts
     stats: Optional[dict] = None
 
 
@@ -189,20 +204,22 @@ async def create_campaign(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new campaign in Draft status."""
-    # Verify all contacts belong to user
-    contacts_result = await db.execute(
-        select(Contact).where(
-            Contact.id.in_(campaign_data.contact_ids),
-            Contact.user_id == current_user.id
+    # Verify all contacts belong to user (if provided)
+    found_contacts = []
+    if campaign_data.contact_ids:
+        contacts_result = await db.execute(
+            select(Contact).where(
+                Contact.id.in_(campaign_data.contact_ids),
+                Contact.user_id == current_user.id
+            )
         )
-    )
-    found_contacts = contacts_result.scalars().all()
-    
-    if len(found_contacts) != len(campaign_data.contact_ids):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="One or more contacts not found or do not belong to user"
-        )
+        found_contacts = contacts_result.scalars().all()
+        
+        if len(found_contacts) != len(campaign_data.contact_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more contacts not found or do not belong to user"
+            )
     
     # Create campaign in transaction
     try:
@@ -215,28 +232,30 @@ async def create_campaign(
         db.add(campaign)
         await db.flush()  # Get campaign ID
         
-        # Create email steps
-        for step_data in campaign_data.email_steps:
-            campaign_email = CampaignEmail(
-                campaign_id=campaign.id,
-                step_number=step_data.step_number,
-                subject=step_data.subject,
-                body_template=step_data.body_template,
-                delay_days=step_data.delay_days,
-                delay_hours=step_data.delay_hours
-            )
-            db.add(campaign_email)
+        # Create email steps (if provided)
+        if campaign_data.email_steps:
+            for step_data in campaign_data.email_steps:
+                campaign_email = CampaignEmail(
+                    campaign_id=campaign.id,
+                    step_number=step_data.step_number,
+                    subject=step_data.subject,
+                    body_template=step_data.body_template,
+                    delay_days=step_data.delay_days,
+                    delay_hours=step_data.delay_hours
+                )
+                db.add(campaign_email)
         
-        # Create campaign recipients
-        for contact in found_contacts:
-            recipient = CampaignRecipient(
-                campaign_id=campaign.id,
-                contact_id=contact.id,
-                status=RecipientStatus.PENDING,
-                current_step=0
-            )
-            recipient.generate_tracking_id()
-            db.add(recipient)
+        # Create campaign recipients (if contacts provided)
+        if found_contacts:
+            for contact in found_contacts:
+                recipient = CampaignRecipient(
+                    campaign_id=campaign.id,
+                    contact_id=contact.id,
+                    status=RecipientStatus.PENDING,
+                    current_step=0
+                )
+                recipient.generate_tracking_id()
+                db.add(recipient)
         
         await db.commit()
         await db.refresh(campaign)
@@ -477,11 +496,14 @@ async def launch_campaign(
     await db.commit()
     
     # Trigger Celery tasks to send initial emails immediately
-    for recipient in recipients:
-        try:
-            send_campaign_email.delay(recipient.id)
-        except Exception as e:
-            logger.error(f"Error queuing email task for recipient {recipient.id}: {str(e)}")
+    if CELERY_AVAILABLE:
+        for recipient in recipients:
+            try:
+                send_campaign_email.delay(recipient.id)
+            except Exception as e:
+                logger.error(f"Error queuing email task for recipient {recipient.id}: {str(e)}")
+    else:
+        logger.warning("Celery not available. Campaign emails will need to be sent manually or via scheduled task.")
     
     logger.info(
         f"User {current_user.id} launched campaign {campaign_id} with {len(recipients)} recipients",

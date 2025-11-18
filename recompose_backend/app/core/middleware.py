@@ -55,18 +55,8 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         return response
 
 
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Middleware to apply rate limiting."""
-    
-    def __init__(self, app, limiter: Limiter):
-        super().__init__(app)
-        self.limiter = limiter
-    
-    async def dispatch(self, request: Request, call_next):
-        # Rate limiting is handled by slowapi decorators
-        # This middleware just ensures limiter is available
-        response = await call_next(request)
-        return response
+# RateLimitMiddleware is now in app.core.rate_limit module
+# Import it from there instead of defining here
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

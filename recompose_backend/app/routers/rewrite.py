@@ -10,6 +10,11 @@ from sqlalchemy import select, desc, func
 from pydantic import BaseModel, Field, field_validator, field_serializer, ConfigDict
 from typing import List, Optional
 from openai import AsyncOpenAI
+try:
+    from anthropic import AsyncAnthropic
+except ImportError:
+    AsyncAnthropic = None
+    logger.warning("Anthropic package not installed. Claude AI features will not be available.")
 from app.db import get_db
 from app.models.user import User
 from app.models.rewrite import RewriteLog
@@ -24,11 +29,21 @@ router = APIRouter(prefix="/api/rewrite", tags=["rewrite"])
 # --- Logger ---
 logger = logging.getLogger(__name__)
 
-# --- OpenAI Client ---
-openai_client = AsyncOpenAI(
-    api_key=settings.OPENAI_API_KEY,
-    timeout=settings.OPENAI_TIMEOUT
-)
+# --- AI Clients ---
+openai_client = None
+anthropic_client = None
+
+if settings.OPENAI_API_KEY:
+    openai_client = AsyncOpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        timeout=settings.OPENAI_TIMEOUT
+    )
+
+if AsyncAnthropic and settings.ANTHROPIC_API_KEY:
+    anthropic_client = AsyncAnthropic(
+        api_key=settings.ANTHROPIC_API_KEY,
+        timeout=settings.OPENAI_TIMEOUT
+    )
 
 
 # --- Pydantic Models ---
@@ -221,14 +236,17 @@ async def rewrite_email(
                    f"Upgrade to Pro plan for higher limits."
         )
     
-    # --- Validate OpenAI API key is set ---
-    if not settings.OPENAI_API_KEY:
+    # --- Validate AI API key is set ---
+    use_anthropic = settings.USE_ANTHROPIC and anthropic_client and settings.ANTHROPIC_API_KEY
+    use_openai = openai_client and settings.OPENAI_API_KEY
+    
+    if not use_anthropic and not use_openai:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="OpenAI API key is not configured. Please set OPENAI_API_KEY in your environment."
+            detail="No AI provider configured. Please set ANTHROPIC_API_KEY or OPENAI_API_KEY in your environment."
         )
     
-    # --- Construct OpenAI prompt ---
+    # --- Construct prompt ---
     prompt = f"""You are a professional writing coach.
 
 Rewrite the email below so it is clear, polite, and concise.
@@ -240,40 +258,77 @@ Email:
 {rewrite_request.email_text}"""
     
     try:
-        # --- Call OpenAI API with retry logic ---
-        async def call_openai():
-            return await openai_client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
-                messages=[
-                    {"role": "system", "content": "You are a professional writing coach."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=settings.OPENAI_MAX_TOKENS,
-                temperature=settings.OPENAI_TEMPERATURE,
-            )
+        rewritten_email = None
+        token_used = 0
         
-        # Apply retry logic if enabled
-        if settings.OPENAI_MAX_RETRIES > 0:
-            response = await retry_with_exponential_backoff(
-                call_openai,
-                max_retries=settings.OPENAI_MAX_RETRIES,
-                initial_delay=settings.OPENAI_RETRY_DELAY
-            )
-        else:
-            response = await call_openai()
+        # Try Anthropic first if configured and enabled
+        if use_anthropic:
+            try:
+                async def call_anthropic():
+                    return await anthropic_client.messages.create(
+                        model=settings.ANTHROPIC_MODEL,
+                        max_tokens=settings.OPENAI_MAX_TOKENS,
+                        temperature=settings.OPENAI_TEMPERATURE,
+                        system="You are a professional writing coach.",
+                        messages=[
+                            {"role": "user", "content": prompt}
+                        ]
+                    )
+                
+                if settings.OPENAI_MAX_RETRIES > 0:
+                    response = await retry_with_exponential_backoff(
+                        call_anthropic,
+                        max_retries=settings.OPENAI_MAX_RETRIES,
+                        initial_delay=settings.OPENAI_RETRY_DELAY
+                    )
+                else:
+                    response = await call_anthropic()
+                
+                if response.content and len(response.content) > 0:
+                    rewritten_email = response.content[0].text.strip()
+                    # Anthropic returns usage in input_tokens and output_tokens
+                    token_used = (response.usage.input_tokens + response.usage.output_tokens) if response.usage else 0
+            except Exception as e:
+                logger.warning(f"Anthropic API error, falling back to OpenAI: {str(e)}")
+                use_anthropic = False
         
-        # --- Extract rewritten email ---
-        if not response.choices or not response.choices[0].message.content:
+        # Fallback to OpenAI if Anthropic failed or not configured
+        if not rewritten_email and use_openai:
+            async def call_openai():
+                return await openai_client.chat.completions.create(
+                    model=settings.OPENAI_MODEL,
+                    messages=[
+                        {"role": "system", "content": "You are a professional writing coach."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=settings.OPENAI_MAX_TOKENS,
+                    temperature=settings.OPENAI_TEMPERATURE,
+                )
+            
+            if settings.OPENAI_MAX_RETRIES > 0:
+                response = await retry_with_exponential_backoff(
+                    call_openai,
+                    max_retries=settings.OPENAI_MAX_RETRIES,
+                    initial_delay=settings.OPENAI_RETRY_DELAY
+                )
+            else:
+                response = await call_openai()
+            
+            if not response.choices or not response.choices[0].message.content:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="AI API returned empty response"
+                )
+            
+            rewritten_email = response.choices[0].message.content.strip()
+            usage = response.usage
+            token_used = extract_tokens_from_usage(usage.model_dump() if usage else None)
+        
+        if not rewritten_email:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="OpenAI API returned empty response"
+                detail="AI API returned empty response"
             )
-        
-        rewritten_email = response.choices[0].message.content.strip()
-        
-        # --- Extract usage information ---
-        usage = response.usage
-        token_used = extract_tokens_from_usage(usage.model_dump() if usage else None)
         
         # --- Count words in rewritten email ---
         word_count = count_words(rewritten_email)
@@ -313,7 +368,7 @@ Email:
         raise
     except Exception as e:
         # Log the full error for debugging but don't expose internal details
-        logger.error(f"OpenAI API error: {str(e)}", exc_info=True)
+        logger.error(f"AI API error: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to rewrite email. Please try again later."

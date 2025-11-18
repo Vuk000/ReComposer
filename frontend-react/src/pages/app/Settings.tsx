@@ -6,23 +6,48 @@ import Input from '@/components/ui/Input'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/contexts/ToastContext'
+import api from '@/lib/api'
+import { AxiosErrorResponse } from '@/types/errors'
 
 const Settings = () => {
   const { user } = useAuth()
   const { settings, billing, updateSettings } = useSettings()
   const { showToast } = useToast()
   const [defaultTone, setDefaultTone] = useState(settings?.default_tone || 'professional')
-  const [styleLearning, setStyleLearning] = useState(settings?.style_learning || false)
+  const [styleLearning, setStyleLearning] = useState(settings?.style_learning_enabled || false)
 
   const handleSave = async () => {
     const success = await updateSettings({
       default_tone: defaultTone as 'professional' | 'friendly' | 'persuasive',
-      style_learning: styleLearning,
+      style_learning_enabled: styleLearning,
     })
     if (success) {
       showToast('Settings saved successfully!', 'success')
     } else {
       showToast('Failed to save settings', 'error')
+    }
+  }
+
+  const handleChangePlan = async () => {
+    try {
+      const response = await api.post<{ checkout_url: string }>('/api/billing/create-checkout', {
+        plan: billing?.plan === 'pro' ? 'standard' : 'pro',
+        interval: 'month',
+      })
+      window.location.href = response.data.checkout_url
+    } catch (err) {
+      const error = err as AxiosErrorResponse
+      showToast(error.response?.data?.detail || 'Failed to create checkout session', 'error')
+    }
+  }
+
+  const handleManageBilling = async () => {
+    try {
+      const response = await api.post<{ portal_url: string }>('/api/billing/customer-portal')
+      window.location.href = response.data.portal_url
+    } catch (err) {
+      const error = err as AxiosErrorResponse
+      showToast(error.response?.data?.detail || 'Failed to open billing portal', 'error')
     }
   }
 
@@ -46,11 +71,11 @@ const Settings = () => {
           <div>
             <label className="mb-2 block text-sm font-medium">Plan</label>
             <div className="flex items-center gap-2">
-              <Badge variant={billing?.plan === 'pro' ? 'default' : 'secondary'}>
-                {billing?.plan === 'pro' ? 'Pro Plan' : 'Standard Plan'}
+              <Badge variant={user?.subscription_plan === 'pro' ? 'default' : 'secondary'}>
+                {user?.subscription_plan === 'pro' ? 'Pro Plan' : 'Standard Plan'}
               </Badge>
               <span className="text-sm text-muted-foreground">
-                {billing?.plan === 'pro' ? '$49.99/month' : '$14.99/month'}
+                {user?.subscription_plan === 'pro' ? '$49.99/month' : '$14.99/month'}
               </span>
             </div>
           </div>
@@ -64,15 +89,21 @@ const Settings = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
-            <Button variant="outline">Change Plan</Button>
-            <Button variant="outline">Manage Billing</Button>
+            <Button variant="outline" onClick={handleChangePlan}>
+              Change Plan
+            </Button>
+            <Button variant="outline" onClick={handleManageBilling}>
+              Manage Billing
+            </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            {billing?.status === 'active'
+            {user?.subscription_status === 'active'
               ? 'Your subscription is active'
-              : billing?.status === 'cancelled'
+              : user?.subscription_status === 'cancelled'
               ? 'Your subscription has been cancelled'
-              : 'Your subscription is past due'}
+              : user?.subscription_status === 'past_due'
+              ? 'Your subscription is past due'
+              : 'Subscription status unknown'}
           </p>
         </CardContent>
       </Card>

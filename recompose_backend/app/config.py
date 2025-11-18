@@ -5,6 +5,7 @@ Uses pydantic-settings for validation and type safety.
 """
 
 import warnings
+import os
 from typing import List
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,13 +24,41 @@ class Settings(BaseSettings):
     # --- Database Configuration ---
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://user:pass@localhost/recompose",
-        description="PostgreSQL connection string using asyncpg driver"
+        description="PostgreSQL connection string using asyncpg driver (supports Neon PostgreSQL)"
+    )
+    DB_POOL_SIZE: int = Field(
+        default=10,
+        ge=1,
+        description="Database connection pool size"
+    )
+    DB_MAX_OVERFLOW: int = Field(
+        default=20,
+        ge=0,
+        description="Maximum overflow connections in pool"
+    )
+    DB_SSL_MODE: str = Field(
+        default="prefer",
+        description="SSL mode for PostgreSQL connections (require, prefer, allow, disable)"
     )
     
     # --- OpenAI Configuration ---
     OPENAI_API_KEY: str = Field(
         default="",
         description="OpenAI API key (required for email rewriting functionality)"
+    )
+    
+    # --- Anthropic Configuration ---
+    ANTHROPIC_API_KEY: str = Field(
+        default="",
+        description="Anthropic API key for Claude Sonnet 4.5 (primary AI provider)"
+    )
+    ANTHROPIC_MODEL: str = Field(
+        default="claude-sonnet-4-20250514",
+        description="Anthropic model to use (claude-sonnet-4-20250514 or claude-3-5-sonnet-20241022)"
+    )
+    USE_ANTHROPIC: bool = Field(
+        default=True,
+        description="Use Anthropic Claude as primary AI provider (fallback to OpenAI if not set)"
     )
     
     # --- JWT Configuration ---
@@ -49,7 +78,7 @@ class Settings(BaseSettings):
     # --- CORS Configuration ---
     # Store as string internally, but expose as list via property
     CORS_ORIGINS_STR: str = Field(
-        default="http://localhost:3000",
+        default="http://localhost:5173,http://localhost:3000",
         alias="CORS_ORIGINS",
         description="Comma-separated list of allowed origins for CORS"
     )
@@ -70,7 +99,7 @@ class Settings(BaseSettings):
     
     # --- Logging Configuration ---
     LOG_FORMAT: str = Field(
-        default="json",
+        default="text" if os.getenv("ENVIRONMENT", "").lower() != "production" else "json",
         description="Log format: 'json' for structured logging, 'text' for human-readable"
     )
     
@@ -151,6 +180,10 @@ class Settings(BaseSettings):
         default="",
         description="Stripe secret key (required when billing enabled)"
     )
+    STRIPE_PUBLISHABLE_KEY: str = Field(
+        default="",
+        description="Stripe publishable key for frontend checkout"
+    )
     STRIPE_WEBHOOK_SECRET: str = Field(
         default="",
         description="Stripe webhook secret for verifying webhook signatures"
@@ -222,6 +255,44 @@ class Settings(BaseSettings):
         description="Base URL for tracking pixels (e.g., https://api.yourdomain.com)"
     )
     
+    # --- Brevo (Sendinblue) Email Service Configuration ---
+    BREVO_API_KEY: str = Field(
+        default="",
+        description="Brevo API key for transactional email sending"
+    )
+    BREVO_SMTP_SERVER: str = Field(
+        default="smtp-relay.brevo.com",
+        description="Brevo SMTP server hostname"
+    )
+    BREVO_SMTP_PORT: int = Field(
+        default=587,
+        ge=1,
+        le=65535,
+        description="Brevo SMTP port (587 for TLS, 465 for SSL)"
+    )
+    BREVO_SMTP_USERNAME: str = Field(
+        default="",
+        description="Brevo SMTP username (usually your Brevo account email)"
+    )
+    BREVO_SMTP_PASSWORD: str = Field(
+        default="",
+        description="Brevo SMTP password (SMTP key, not account password)"
+    )
+    BREVO_WEBHOOK_SECRET: str = Field(
+        default="",
+        description="Brevo webhook secret for verifying webhook signatures"
+    )
+    
+    # --- Frontend/Backend URLs ---
+    FRONTEND_URL: str = Field(
+        default="http://localhost:5173",
+        description="Frontend application URL (for CORS and redirects)"
+    )
+    BACKEND_URL: str = Field(
+        default="http://localhost:8000",
+        description="Backend API URL (for tracking links and webhooks)"
+    )
+    
     # --- Celery Configuration ---
     CELERY_BROKER_URL: str = Field(
         default="redis://localhost:6379/0",
@@ -249,11 +320,37 @@ class Settings(BaseSettings):
     )
     STRIPE_PRO_PRICE_ID: str = Field(
         default="",
-        description="Stripe price ID for Pro plan"
+        description="Stripe price ID for Pro plan (monthly) - deprecated, use lookup keys"
+    )
+    STRIPE_PRO_PRICE_ID_YEARLY: str = Field(
+        default="",
+        description="Stripe price ID for Pro plan (yearly) - deprecated, use lookup keys"
     )
     STRIPE_STANDARD_PRICE_ID: str = Field(
         default="",
-        description="Stripe price ID for Standard plan"
+        description="Stripe price ID for Standard plan (monthly) - deprecated, use lookup keys"
+    )
+    STRIPE_STANDARD_PRICE_ID_YEARLY: str = Field(
+        default="",
+        description="Stripe price ID for Standard plan (yearly) - deprecated, use lookup keys"
+    )
+    
+    # Stripe lookup keys (preferred method)
+    STRIPE_STANDARD_MONTHLY_LOOKUP_KEY: str = Field(
+        default="recompose_monthly_standard",
+        description="Stripe lookup key for Standard plan (monthly)"
+    )
+    STRIPE_PRO_MONTHLY_LOOKUP_KEY: str = Field(
+        default="recompose_monthly_pro",
+        description="Stripe lookup key for Pro plan (monthly)"
+    )
+    STRIPE_STANDARD_YEARLY_LOOKUP_KEY: str = Field(
+        default="recompose_yearly_standard",
+        description="Stripe lookup key for Standard plan (yearly)"
+    )
+    STRIPE_PRO_YEARLY_LOOKUP_KEY: str = Field(
+        default="recompose_yearly_pro",
+        description="Stripe lookup key for Pro plan (yearly)"
     )
     
     @field_validator("OPENAI_API_KEY")

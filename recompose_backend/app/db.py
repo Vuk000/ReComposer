@@ -8,20 +8,44 @@ from sqlalchemy.orm import declarative_base
 from app.config import settings
 
 # --- Database Engine ---
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,  # Log SQL queries in debug mode
-    future=True,
-    pool_size=10,  # Connection pool size
-    max_overflow=20,  # Maximum overflow connections
-    pool_pre_ping=True,  # Verify connections before using (handles reconnection)
-    pool_recycle=settings.DB_POOL_RECYCLE,  # Recycle connections after this many seconds
-    connect_args={
+# Configure connection args for PostgreSQL (including Neon)
+connect_args = {}
+if "postgresql" in settings.DATABASE_URL:
+    connect_args = {
         "server_settings": {
             "application_name": settings.APP_NAME,
         },
         "command_timeout": int(settings.DB_CONNECT_TIMEOUT),
-    } if "postgresql" in settings.DATABASE_URL else {},
+    }
+    # Add SSL mode for Neon PostgreSQL (requires SSL)
+    # asyncpg expects ssl parameter as string or SSL context, not boolean
+    if "neon" in settings.DATABASE_URL.lower() or settings.DB_SSL_MODE != "disable":
+        if settings.DB_SSL_MODE == "require":
+            connect_args["ssl"] = "require"
+        elif settings.DB_SSL_MODE == "prefer":
+            connect_args["ssl"] = "prefer"
+        elif settings.DB_SSL_MODE == "allow":
+            connect_args["ssl"] = "allow"
+        # "disable" is handled by not setting ssl parameter
+
+# Configure engine parameters
+# SQLite doesn't support pool_size, max_overflow, or pool_recycle
+engine_kwargs = {
+    "echo": settings.DEBUG,  # Log SQL queries in debug mode
+    "future": True,
+    "pool_pre_ping": True,  # Verify connections before using (handles reconnection)
+    "connect_args": connect_args,
+}
+
+# Only add pool settings for PostgreSQL (not SQLite)
+if "postgresql" in settings.DATABASE_URL or "postgres" in settings.DATABASE_URL:
+    engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
+    engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+    engine_kwargs["pool_recycle"] = settings.DB_POOL_RECYCLE
+
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    **engine_kwargs
 )
 
 # --- Session Factory ---

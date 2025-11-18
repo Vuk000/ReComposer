@@ -18,6 +18,12 @@ try:
     from app.services.email.outlook_service import send_via_outlook
 except ImportError:
     send_via_outlook = None
+
+try:
+    from app.services.email.brevo_service import send_via_brevo
+except ImportError:
+    send_via_brevo = None
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -125,6 +131,19 @@ async def send_email(
                 body=body,
                 html_body=html_body,
                 tracking_id=tracking_id,
+            )
+        elif email_account.provider == EmailProvider.BREVO:
+            if send_via_brevo is None:
+                raise ValueError("Brevo service not available")
+            result = await send_via_brevo(
+                email_account=email_account,
+                to_email=to_email,
+                to_name=to_name,
+                subject=subject,
+                body=body,
+                html_body=html_body,
+                tracking_id=tracking_id,
+                use_api=True,  # Prefer API over SMTP
             )
         else:
             raise ValueError(f"Unsupported email provider: {email_account.provider}")

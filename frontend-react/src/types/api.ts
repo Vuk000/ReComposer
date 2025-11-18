@@ -20,8 +20,6 @@ export interface RewriteRequest {
 
 export interface RewriteResponse {
   rewritten_email: string
-  word_count: number
-  token_used: number
 }
 
 export interface UsageStats {
@@ -35,15 +33,48 @@ export interface Campaign {
   id: number
   name: string
   description?: string
-  status: 'draft' | 'active' | 'paused' | 'completed' | 'cancelled'
+  status: 'draft' | 'running' | 'paused' | 'completed' | 'cancelled'
   created_at: string
   launched_at?: string
   paused_at?: string
+  email_steps?: CampaignEmail[]
+  stats?: CampaignStats
+}
+
+export interface CampaignEmail {
+  id: number
+  step_number: number
+  subject: string
+  body_template: string
+  delay_days: number
+  delay_hours: number
+  created_at: string
+}
+
+export interface CampaignStats {
+  total_recipients: number
+  pending: number
+  sent: number
+  replied: number
+  bounced: number
+  failed: number
+  skipped: number
+  total_opens: number
 }
 
 export interface CampaignCreate {
   name: string
   description?: string
+  contact_ids?: number[]
+  email_steps?: EmailStepCreate[]
+}
+
+export interface EmailStepCreate {
+  step_number: number
+  subject: string
+  body_template: string
+  delay_days?: number
+  delay_hours?: number
 }
 
 export interface CampaignUpdate {
@@ -52,8 +83,10 @@ export interface CampaignUpdate {
 }
 
 export interface Settings {
-  default_tone: 'professional' | 'friendly' | 'persuasive'
-  style_learning: boolean
+  default_tone: 'professional' | 'friendly' | 'persuasive' | null
+  style_learning_enabled: boolean
+  email_notifications?: boolean
+  marketing_emails?: boolean
 }
 
 export interface BillingStatus {

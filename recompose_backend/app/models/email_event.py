@@ -13,6 +13,7 @@ import enum
 class EventType(str, enum.Enum):
     """Email event type enumeration."""
     OPEN = "OPEN"
+    CLICK = "CLICK"
     REPLY = "REPLY"
 
 

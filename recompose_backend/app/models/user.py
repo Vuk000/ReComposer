@@ -31,6 +31,10 @@ class User(Base):
     stripe_subscription_id = Column(String, nullable=True)
     trial_end_date = Column(DateTime, nullable=True)  # Optional trial period end date
     
+    # --- Password Reset Fields ---
+    password_reset_token = Column(String, nullable=True, index=True)
+    password_reset_expires = Column(DateTime, nullable=True)
+    
     # --- Relationships ---
     rewrite_logs = relationship("RewriteLog", back_populates="user", cascade="all, delete-orphan")
     contacts = relationship("Contact", back_populates="user", cascade="all, delete-orphan")
