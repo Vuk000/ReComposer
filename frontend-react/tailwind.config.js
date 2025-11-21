@@ -7,58 +7,58 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Violet Bloom Design System
+        // Natural Blue-Purple Design System
         primary: {
-          DEFAULT: '#8c5cff',
+          DEFAULT: '#8b5cf6',
           foreground: '#ffffff',
         },
         secondary: {
-          DEFAULT: '#2a2c33',
-          foreground: '#f0f0f0',
+          DEFAULT: '#64748b',
+          foreground: '#f1f5f9',
         },
         accent: {
-          DEFAULT: '#1e293b',
-          foreground: '#79c0ff',
-        },
-        background: '#1a1b1e',
-        foreground: '#f0f0f0',
-        card: {
-          DEFAULT: '#222327',
-          foreground: '#f0f0f0',
-        },
-        popover: {
-          DEFAULT: '#222327',
-          foreground: '#f0f0f0',
-        },
-        muted: {
-          DEFAULT: '#2a2c33',
-          foreground: '#a0a0a0',
-        },
-        destructive: {
-          DEFAULT: '#f87171',
+          DEFAULT: '#7c3aed',
           foreground: '#ffffff',
         },
-        border: '#33353a',
-        input: '#33353a',
-        ring: '#8c5cff',
+        background: '#0f172a',
+        foreground: '#e2e8f0',
+        card: {
+          DEFAULT: '#1e293b',
+          foreground: '#e2e8f0',
+        },
+        popover: {
+          DEFAULT: '#1e293b',
+          foreground: '#e2e8f0',
+        },
+        muted: {
+          DEFAULT: '#334155',
+          foreground: '#94a3b8',
+        },
+        destructive: {
+          DEFAULT: '#ef4444',
+          foreground: '#ffffff',
+        },
+        border: '#334155',
+        input: '#334155',
+        ring: '#8b5cf6',
         // Chart colors
         chart: {
-          1: '#4ade80',
-          2: '#8c5cff',
-          3: '#fca5a5',
-          4: '#5993f4',
-          5: '#a0a0a0',
+          1: '#34d399',
+          2: '#8b5cf6',
+          3: '#f472b6',
+          4: '#60a5fa',
+          5: '#a78bfa',
         },
         // Sidebar colors
         sidebar: {
-          DEFAULT: '#161618',
-          foreground: '#f0f0f0',
-          primary: '#8c5cff',
+          DEFAULT: '#0c1222',
+          foreground: '#e2e8f0',
+          primary: '#8b5cf6',
           'primary-foreground': '#ffffff',
-          accent: '#2a2c33',
-          'accent-foreground': '#8c5cff',
-          border: '#33353a',
-          ring: '#8c5cff',
+          accent: '#1e293b',
+          'accent-foreground': '#a78bfa',
+          border: '#1e293b',
+          ring: '#8b5cf6',
         },
       },
       fontFamily: {

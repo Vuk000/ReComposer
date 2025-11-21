@@ -30,7 +30,7 @@ class EmailEvent(Base):
     
     # --- Event Information ---
     event_type = Column(SQLEnum(EventType), nullable=False, index=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False, index=True)
     event_metadata = Column(JSON, nullable=True)  # Additional event data (IP address, user agent, etc.)
     
     # --- Relationships ---

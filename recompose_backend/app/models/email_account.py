@@ -46,8 +46,8 @@ class EmailAccount(Base):
     is_default = Column(Boolean, default=False, nullable=False)
     
     # --- Timestamps ---
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.utcnow(), onupdate=lambda: datetime.utcnow(), nullable=False)
     
     # --- Relationships ---
     user = relationship("User", back_populates="email_accounts")

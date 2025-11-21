@@ -30,7 +30,7 @@ class RewriteLog(Base):
     token_used = Column(BigInteger, nullable=False, default=0)  # OpenAI tokens consumed
     
     # --- Timestamps ---
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False, index=True)
     
     # --- Relationships ---
     user = relationship("User", back_populates="rewrite_logs")

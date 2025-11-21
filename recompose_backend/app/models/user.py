@@ -3,7 +3,7 @@
 User model for authentication and user management.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 from app.db import Base
@@ -22,7 +22,8 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     
     # --- Timestamps ---
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    # Use timezone-naive datetime to match TIMESTAMP WITHOUT TIME ZONE in PostgreSQL
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     
     # --- Subscription Fields ---
     subscription_plan = Column(String, default="standard", nullable=False)  # standard ($14.99/month), pro ($49.99/month)

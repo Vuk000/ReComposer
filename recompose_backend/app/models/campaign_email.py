@@ -28,7 +28,7 @@ class CampaignEmail(Base):
     delay_hours = Column(Integer, default=0, nullable=False)  # Additional hours for precise timing
     
     # --- Timestamps ---
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     
     # --- Relationships ---
     campaign = relationship("Campaign", back_populates="campaign_emails")

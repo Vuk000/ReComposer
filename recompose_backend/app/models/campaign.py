@@ -36,7 +36,7 @@ class Campaign(Base):
     status = Column(SQLEnum(CampaignStatus), default=CampaignStatus.DRAFT, nullable=False, index=True)
     
     # --- Timestamps ---
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     launched_at = Column(DateTime, nullable=True)
     paused_at = Column(DateTime, nullable=True)
     

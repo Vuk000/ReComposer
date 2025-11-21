@@ -12,6 +12,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, field_serializ
 from app.db import get_db
 from app.models.user import User
 from app.config import settings
+import traceback
 from app.core.security import (
     verify_password,
     get_password_hash,
@@ -21,7 +22,7 @@ from app.core.security import (
 import logging
 
 # --- Router Setup ---
-router = APIRouter(prefix="/api/auth", tags=["authentication"])
+router = APIRouter(prefix="/auth", tags=["authentication"])
 
 # --- Logger ---
 logger = logging.getLogger(__name__)
@@ -138,39 +139,51 @@ async def signup(request: Request, user_data: UserSignup, db: AsyncSession = Dep
     Raises:
         HTTPException: If email already exists
     """
-    # Rate limiting is handled by middleware if enabled
-    # --- Check if user already exists ---
-    result = await db.execute(select(User).where(User.email == user_data.email))
-    existing_user = result.scalar_one_or_none()
-    
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+    try:
+        # Rate limiting is handled by middleware if enabled
+        # --- Check if user already exists ---
+        result = await db.execute(select(User).where(User.email == user_data.email))
+        existing_user = result.scalar_one_or_none()
+        
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        # --- Create new user ---
+        hashed_password = get_password_hash(user_data.password)
+        new_user = User(
+            email=user_data.email,
+            hashed_password=hashed_password
         )
-    
-    # --- Create new user ---
-    hashed_password = get_password_hash(user_data.password)
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hashed_password
-    )
-    
-    db.add(new_user)
-    await db.commit()
-    await db.refresh(new_user)
-    
-    logger.info(
-        f"User {new_user.id} signed up successfully",
-        extra={"request_id": getattr(request.state, "request_id", "unknown")}
-    )
-    
-    # Create and return access token
-    access_token = create_access_token(data={"sub": str(new_user.id)})
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+        
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        
+        logger.info(
+            f"User {new_user.id} signed up successfully",
+            extra={"request_id": getattr(request.state, "request_id", "unknown")}
+        )
+        
+        # Create and return access token
+        access_token = create_access_token(data={"sub": str(new_user.id)})
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = str(e)
+        error_trace = traceback.format_exc()
+        logger.error(f"Signup error: {error_msg}\n{error_trace}", exc_info=True, extra={"request_id": getattr(request.state, "request_id", "unknown")})
+        # Always show error in response for debugging
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {error_msg}"
+        )
 
 
 # --- Login Endpoint ---

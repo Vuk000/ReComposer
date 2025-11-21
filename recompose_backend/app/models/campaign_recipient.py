@@ -51,7 +51,7 @@ class CampaignRecipient(Base):
     error_message = Column(Text, nullable=True)
     
     # --- Timestamps ---
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow(), nullable=False)
     
     # --- Relationships ---
     campaign = relationship("Campaign", back_populates="campaign_recipients")

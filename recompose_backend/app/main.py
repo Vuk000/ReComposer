@@ -175,9 +175,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def general_exception_handler(request: Request, exc: Exception):
     """Handle general exceptions."""
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
+    # Show detailed error in DEBUG mode or if it's an HTTPException with detail
+    error_detail = "Internal server error"
+    if settings.DEBUG:
+        import traceback
+        error_detail = f"{str(exc)}\n{traceback.format_exc()}"
+    elif isinstance(exc, HTTPException):
+        error_detail = exc.detail
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error"},
+        content={"detail": error_detail},
     )
 
 
