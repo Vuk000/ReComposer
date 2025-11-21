@@ -19,7 +19,7 @@ const Campaigns = () => {
   const getStatusBadge = (status: Campaign['status']) => {
     const variants: Record<Campaign['status'], 'default' | 'secondary' | 'outline'> = {
       draft: 'outline',
-      active: 'default',
+      running: 'default',
       paused: 'secondary',
       completed: 'secondary',
       cancelled: 'outline',

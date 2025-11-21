@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom'
 import AuthLayout from '@/components/layout/AuthLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { useAuth } from '@/hooks/useAuth'
 import { Github, Lock } from 'lucide-react'
 import api from '@/lib/api'
 
@@ -15,7 +14,6 @@ const Signup = () => {
   const [searchParams] = useSearchParams()
   const plan = searchParams.get('plan')
   const billing = searchParams.get('billing') || 'monthly'
-  const { signup } = useAuth()
 
   const validate = () => {
     const newErrors: { email?: string; password?: string } = {}

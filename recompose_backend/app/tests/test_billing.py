@@ -16,7 +16,7 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
     """Create and authenticate a test user."""
     # Create user
     signup_response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -25,7 +25,7 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
     
     # Login to get token
     login_response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -52,7 +52,7 @@ async def test_get_subscription_status_free_user(
 ):
     """Test getting subscription status for free user."""
     response = await client.get(
-        "/billing/status",
+        "/api/billing/status",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -67,7 +67,7 @@ async def test_get_subscription_status_free_user(
 @pytest.mark.asyncio
 async def test_get_subscription_status_unauthorized(client: AsyncClient):
     """Test subscription status endpoint without authentication fails."""
-    response = await client.get("/billing/status")
+    response = await client.get("/api/billing/status")
     
     assert response.status_code == 401
 
@@ -92,7 +92,7 @@ async def test_subscribe_success(
          patch("app.routers.billing.stripe.Subscription.create", return_value=mock_subscription):
         
         response = await client.post(
-            "/billing/subscribe",
+            "/api/billing/subscribe",
             json={
                 "plan": "pro"
             },
@@ -124,7 +124,7 @@ async def test_subscribe_invalid_plan(
 ):
     """Test subscription with invalid plan fails."""
     response = await client.post(
-        "/billing/subscribe",
+        "/api/billing/subscribe",
         json={
             "plan": "invalid_plan"
         },
@@ -145,7 +145,7 @@ async def test_subscribe_billing_disabled(
     monkeypatch.setenv("BILLING_ENABLED", "false")
     
     response = await client.post(
-        "/billing/subscribe",
+        "/api/billing/subscribe",
         json={
             "plan": "pro"
         },
@@ -159,7 +159,7 @@ async def test_subscribe_billing_disabled(
 async def test_subscribe_unauthorized(client: AsyncClient):
     """Test subscription endpoint without authentication fails."""
     response = await client.post(
-        "/billing/subscribe",
+        "/api/billing/subscribe",
         json={
             "plan": "pro"
         }
@@ -193,7 +193,7 @@ async def test_cancel_subscription_success(
     
     with patch("app.routers.billing.stripe.Subscription.modify", return_value=mock_subscription):
         response = await client.post(
-            "/billing/cancel",
+            "/api/billing/cancel",
             headers={"Authorization": f"Bearer {authenticated_user}"}
         )
     
@@ -213,7 +213,7 @@ async def test_cancel_no_subscription(
 ):
     """Test cancellation when user has no subscription."""
     response = await client.post(
-        "/billing/cancel",
+        "/api/billing/cancel",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -224,7 +224,7 @@ async def test_cancel_no_subscription(
 @pytest.mark.asyncio
 async def test_cancel_unauthorized(client: AsyncClient):
     """Test cancel endpoint without authentication fails."""
-    response = await client.post("/billing/cancel")
+    response = await client.post("/api/billing/cancel")
     
     assert response.status_code == 401
 
@@ -264,7 +264,7 @@ async def test_webhook_subscription_created(
     # Mock Stripe webhook verification
     with patch("app.routers.billing.stripe.Webhook.construct_event", return_value=mock_event):
         response = await client.post(
-            "/billing/webhook",
+            "/api/billing/webhook",
             headers={"stripe-signature": "test_signature"},
             content=b'{"test": "data"}'
         )
@@ -314,7 +314,7 @@ async def test_webhook_subscription_updated(
     
     with patch("app.routers.billing.stripe.Webhook.construct_event", return_value=mock_event):
         response = await client.post(
-            "/billing/webhook",
+            "/api/billing/webhook",
             headers={"stripe-signature": "test_signature"},
             content=b'{"test": "data"}'
         )
@@ -357,7 +357,7 @@ async def test_webhook_subscription_deleted(
     
     with patch("app.routers.billing.stripe.Webhook.construct_event", return_value=mock_event):
         response = await client.post(
-            "/billing/webhook",
+            "/api/billing/webhook",
             headers={"stripe-signature": "test_signature"},
             content=b'{"test": "data"}'
         )
@@ -381,7 +381,7 @@ async def test_webhook_invalid_signature(client: AsyncClient):
         )
         
         response = await client.post(
-            "/billing/webhook",
+            "/api/billing/webhook",
             headers={"stripe-signature": "invalid_signature"},
             content=b'{"test": "data"}'
         )
@@ -396,7 +396,7 @@ async def test_webhook_billing_disabled(client: AsyncClient, monkeypatch):
     monkeypatch.setenv("BILLING_ENABLED", "false")
     
     response = await client.post(
-        "/billing/webhook",
+        "/api/billing/webhook",
         headers={"stripe-signature": "test_signature"},
         content=b'{"test": "data"}'
     )

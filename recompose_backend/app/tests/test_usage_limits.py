@@ -19,7 +19,7 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
     """Create and authenticate a test user."""
     # Create user
     signup_response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -28,7 +28,7 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
     
     # Login to get token (using JSON body)
     login_response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -44,7 +44,7 @@ async def pro_user(client: AsyncClient, db_session: AsyncSession):
     """Create and authenticate a pro plan user."""
     # Create user
     signup_response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "pro@example.com",
             "password": "testpassword123"
@@ -62,7 +62,7 @@ async def pro_user(client: AsyncClient, db_session: AsyncSession):
     
     # Login to get token
     login_response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "pro@example.com",
             "password": "testpassword123"
@@ -97,7 +97,7 @@ async def test_get_usage_free_user(
 ):
     """Test usage endpoint for free user."""
     response = await client.get(
-        "/rewrite/usage",
+        "/api/rewrite/usage",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -120,7 +120,7 @@ async def test_get_usage_pro_user(
 ):
     """Test usage endpoint for pro user."""
     response = await client.get(
-        "/rewrite/usage",
+        "/api/rewrite/usage",
         headers={"Authorization": f"Bearer {pro_user}"}
     )
     
@@ -143,7 +143,7 @@ async def test_usage_updates_after_rewrite(
         mock_create.return_value = create_mock_openai_response("Rewritten email", 100)
         
         await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": "Original email",
                 "tone": "professional"
@@ -153,7 +153,7 @@ async def test_usage_updates_after_rewrite(
     
     # Check usage
     response = await client.get(
-        "/rewrite/usage",
+        "/api/rewrite/usage",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -199,7 +199,7 @@ async def test_free_user_limit_enforcement(
         mock_create.return_value = create_mock_openai_response("Should not work", 100)
         
         response = await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": "New email",
                 "tone": "professional"
@@ -247,7 +247,7 @@ async def test_pro_user_no_limit_enforcement(
         mock_create.return_value = create_mock_openai_response("Should work", 100)
         
         response = await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": "New email",
                 "tone": "professional"
@@ -304,7 +304,7 @@ async def test_usage_resets_at_utc_midnight(
     
     # Check usage - should only count recent rewrite from today
     response = await client.get(
-        "/rewrite/usage",
+        "/api/rewrite/usage",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -317,7 +317,7 @@ async def test_usage_resets_at_utc_midnight(
 @pytest.mark.asyncio
 async def test_usage_endpoint_unauthorized(client: AsyncClient):
     """Test usage endpoint without authentication fails."""
-    response = await client.get("/rewrite/usage")
+    response = await client.get("/api/rewrite/usage")
     
     assert response.status_code == 401
 

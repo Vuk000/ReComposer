@@ -1,15 +1,20 @@
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import AuthLayout from '@/components/layout/AuthLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
+import api from '@/lib/api'
+import { useToast } from '@/contexts/ToastContext'
 
 const ResetPassword = () => {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({})
+  const [loading, setLoading] = useState(false)
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const token = searchParams.get('token')
+  const { showToast } = useToast()
 
   const validate = () => {
     const newErrors: { password?: string; confirmPassword?: string } = {}
@@ -17,6 +22,13 @@ const ResetPassword = () => {
       newErrors.password = 'Password is required'
     } else if (password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters'
+    } else {
+      // Check for at least one letter and one number
+      const hasLetter = /[a-zA-Z]/.test(password)
+      const hasNumber = /[0-9]/.test(password)
+      if (!hasLetter || !hasNumber) {
+        newErrors.password = 'Password must contain at least one letter and one number'
+      }
     }
     if (password !== confirmPassword) {
       newErrors.confirmPassword = 'Passwords do not match'
@@ -29,8 +41,22 @@ const ResetPassword = () => {
     e.preventDefault()
     if (!validate() || !token) return
 
-    // TODO: Implement password reset API call
-    console.log('Reset password with token:', token)
+    setLoading(true)
+    try {
+      await api.post('/api/auth/reset-password', {
+        token,
+        password,
+      })
+      showToast('Password reset successfully! You can now login.', 'success')
+      navigate('/login')
+    } catch (err) {
+      const error = err as { response?: { data?: { detail?: string } }; message?: string }
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to reset password'
+      setErrors({ password: errorMessage })
+      showToast(errorMessage, 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (!token) {
@@ -83,8 +109,8 @@ const ResetPassword = () => {
           {errors.confirmPassword && <p className="mt-1 text-sm text-destructive">{errors.confirmPassword}</p>}
         </div>
 
-        <Button type="submit" className="w-full">
-          Reset Password
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Resetting...' : 'Reset Password'}
         </Button>
       </form>
     </AuthLayout>

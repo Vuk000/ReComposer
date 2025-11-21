@@ -18,7 +18,7 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
     """Create and authenticate a test user."""
     # Create user
     signup_response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -27,7 +27,7 @@ async def authenticated_user(client: AsyncClient, db_session: AsyncSession):
     
     # Login to get token (using JSON body)
     login_response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -72,7 +72,7 @@ async def test_rewrite_success(
         mock_create.return_value = mock_response
         
         response = await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": original_text,
                 "tone": "professional"
@@ -107,7 +107,7 @@ async def test_rewrite_different_tones(
             mock_create.return_value = create_mock_openai_response(f"Rewritten with {tone} tone")
             
             response = await client.post(
-                "/rewrite",
+                "/api/rewrite",
                 json={
                     "email_text": "Test email",
                     "tone": tone
@@ -126,7 +126,7 @@ async def test_rewrite_invalid_tone(
 ):
     """Test rewrite with invalid tone fails."""
     response = await client.post(
-        "/rewrite",
+        "/api/rewrite",
         json={
             "email_text": "Test email",
             "tone": "invalid_tone"
@@ -147,7 +147,7 @@ async def test_rewrite_empty_email(
 ):
     """Test rewrite with empty email text fails."""
     response = await client.post(
-        "/rewrite",
+        "/api/rewrite",
         json={
             "email_text": "",
             "tone": "professional"
@@ -166,7 +166,7 @@ async def test_rewrite_empty_email(
 async def test_rewrite_unauthorized(client: AsyncClient):
     """Test rewrite without authentication fails."""
     response = await client.post(
-        "/rewrite",
+        "/api/rewrite",
         json={
             "email_text": "Test email",
             "tone": "professional"
@@ -186,7 +186,7 @@ async def test_rewrite_openai_error(
         mock_create.side_effect = Exception("OpenAI API Error")
         
         response = await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": "Test email",
                 "tone": "professional"
@@ -213,7 +213,7 @@ async def test_rewrite_logs_usage(
         mock_create.return_value = mock_response
         
         await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": "Original email",
                 "tone": "professional"
@@ -253,7 +253,7 @@ async def test_get_logs_success(
         mock_create.return_value = mock_response
         
         await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": original_text,
                 "tone": "professional"
@@ -263,7 +263,7 @@ async def test_get_logs_success(
     
     # Get logs
     response = await client.get(
-        "/rewrite/logs",
+        "/api/rewrite/logs",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -293,7 +293,7 @@ async def test_get_logs_empty(
 ):
     """Test getting logs when user has no rewrites."""
     response = await client.get(
-        "/rewrite/logs",
+        "/api/rewrite/logs",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -317,7 +317,7 @@ async def test_get_logs_pagination(
             mock_create.return_value = create_mock_openai_response(f"Rewritten {i}", 100)
             
             await client.post(
-                "/rewrite",
+                "/api/rewrite",
                 json={
                     "email_text": f"Original {i}",
                     "tone": "professional"
@@ -327,7 +327,7 @@ async def test_get_logs_pagination(
     
     # Get first page with limit 2
     response = await client.get(
-        "/rewrite/logs?limit=2&offset=0",
+        "/api/rewrite/logs?limit=2&offset=0",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -340,7 +340,7 @@ async def test_get_logs_pagination(
     
     # Get second page
     response = await client.get(
-        "/rewrite/logs?limit=2&offset=2",
+        "/api/rewrite/logs?limit=2&offset=2",
         headers={"Authorization": f"Bearer {authenticated_user}"}
     )
     
@@ -355,7 +355,7 @@ async def test_get_logs_pagination(
 @pytest.mark.asyncio
 async def test_get_logs_unauthorized(client: AsyncClient):
     """Test getting logs without authentication fails."""
-    response = await client.get("/rewrite/logs")
+    response = await client.get("/api/rewrite/logs")
     
     assert response.status_code == 401
 
@@ -368,14 +368,14 @@ async def test_get_logs_user_isolation(
     """Test that users only see their own logs."""
     # Create first user and make a rewrite
     user1_response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "user1@example.com",
             "password": "password123"
         }
     )
     user1_login = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "user1@example.com",
             "password": "password123"
@@ -387,7 +387,7 @@ async def test_get_logs_user_isolation(
         mock_create.return_value = create_mock_openai_response("User1 rewrite", 100)
         
         await client.post(
-            "/rewrite",
+            "/api/rewrite",
             json={
                 "email_text": "User1 original",
                 "tone": "professional"
@@ -397,14 +397,14 @@ async def test_get_logs_user_isolation(
     
     # Create second user
     user2_response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "user2@example.com",
             "password": "password123"
         }
     )
     user2_login = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "user2@example.com",
             "password": "password123"
@@ -414,7 +414,7 @@ async def test_get_logs_user_isolation(
     
     # User2 should see no logs
     response = await client.get(
-        "/rewrite/logs",
+        "/api/rewrite/logs",
         headers={"Authorization": f"Bearer {user2_token}"}
     )
     

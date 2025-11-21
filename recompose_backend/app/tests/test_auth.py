@@ -15,7 +15,7 @@ from app.core.security import verify_password, create_access_token, decode_acces
 async def test_signup_success(client: AsyncClient, db_session: AsyncSession):
     """Test successful user signup."""
     response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -24,10 +24,16 @@ async def test_signup_success(client: AsyncClient, db_session: AsyncSession):
     
     assert response.status_code == 201
     data = response.json()
-    assert data["email"] == "test@example.com"
-    assert "id" in data
-    assert "created_at" in data
-    assert "hashed_password" not in data
+    assert "access_token" in data
+    assert data["token_type"] == "bearer"
+    assert len(data["access_token"]) > 0
+    
+    # Verify user was created in database
+    from sqlalchemy import select
+    result = await db_session.execute(select(User).where(User.email == "test@example.com"))
+    user = result.scalar_one_or_none()
+    assert user is not None
+    assert user.email == "test@example.com"
 
 
 @pytest.mark.asyncio
@@ -35,7 +41,7 @@ async def test_signup_duplicate_email(client: AsyncClient, db_session: AsyncSess
     """Test signup with duplicate email fails."""
     # Create first user
     await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -44,7 +50,7 @@ async def test_signup_duplicate_email(client: AsyncClient, db_session: AsyncSess
     
     # Try to create duplicate
     response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "anotherpassword123"
@@ -59,7 +65,7 @@ async def test_signup_duplicate_email(client: AsyncClient, db_session: AsyncSess
 async def test_signup_invalid_email(client: AsyncClient, db_session: AsyncSession):
     """Test signup with invalid email format."""
     response = await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "not-an-email",
             "password": "testpassword123"
@@ -75,7 +81,7 @@ async def test_login_success(client: AsyncClient, db_session: AsyncSession):
     """Test successful login returns JWT token."""
     # Create user first
     await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -84,7 +90,7 @@ async def test_login_success(client: AsyncClient, db_session: AsyncSession):
     
     # Login
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -108,7 +114,7 @@ async def test_login_invalid_credentials(client: AsyncClient, db_session: AsyncS
     """Test login with invalid credentials fails."""
     # Create user first
     await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -117,7 +123,7 @@ async def test_login_invalid_credentials(client: AsyncClient, db_session: AsyncS
     
     # Try login with wrong password
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "test@example.com",
             "password": "wrongpassword"
@@ -132,7 +138,7 @@ async def test_login_invalid_credentials(client: AsyncClient, db_session: AsyncS
 async def test_login_nonexistent_user(client: AsyncClient, db_session: AsyncSession):
     """Test login with non-existent user fails."""
     response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "nonexistent@example.com",
             "password": "somepassword"
@@ -148,7 +154,7 @@ async def test_get_current_user(client: AsyncClient, db_session: AsyncSession):
     """Test getting current user with valid token."""
     # Create user and login
     await client.post(
-        "/auth/signup",
+        "/api/auth/signup",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -156,7 +162,7 @@ async def test_get_current_user(client: AsyncClient, db_session: AsyncSession):
     )
     
     login_response = await client.post(
-        "/auth/login",
+        "/api/auth/login",
         json={
             "email": "test@example.com",
             "password": "testpassword123"
@@ -167,7 +173,7 @@ async def test_get_current_user(client: AsyncClient, db_session: AsyncSession):
     
     # Get current user
     response = await client.get(
-        "/auth/me",
+        "/api/auth/me",
         headers={"Authorization": f"Bearer {token}"}
     )
     
@@ -181,7 +187,7 @@ async def test_get_current_user(client: AsyncClient, db_session: AsyncSession):
 async def test_get_current_user_invalid_token(client: AsyncClient):
     """Test getting current user with invalid token fails."""
     response = await client.get(
-        "/auth/me",
+        "/api/auth/me",
         headers={"Authorization": "Bearer invalid_token"}
     )
     
@@ -191,7 +197,7 @@ async def test_get_current_user_invalid_token(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_current_user_no_token(client: AsyncClient):
     """Test getting current user without token fails."""
-    response = await client.get("/auth/me")
+    response = await client.get("/api/auth/me")
     
     assert response.status_code == 401
 
