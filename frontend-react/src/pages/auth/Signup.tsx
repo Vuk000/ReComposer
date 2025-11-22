@@ -3,30 +3,53 @@ import { Link, useSearchParams } from 'react-router-dom'
 import AuthLayout from '@/components/layout/AuthLayout'
 import Button from '@/components/ui/Button'
 import Input from '@/components/ui/Input'
-import { Github, Lock } from 'lucide-react'
+import PasswordRequirements from '@/components/auth/PasswordRequirements'
+import { Github, Lock, Sparkles } from 'lucide-react'
 import api from '@/lib/api'
 
 const Signup = () => {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string; confirmPassword?: string }>({})
   const [loading, setLoading] = useState(false)
   const [searchParams] = useSearchParams()
   const plan = searchParams.get('plan')
   const billing = searchParams.get('billing') || 'monthly'
 
+  const validatePassword = (pwd: string): boolean => {
+    if (pwd.length < 8) return false
+    const hasLetter = /[a-zA-Z]/.test(pwd)
+    const hasNumber = /\d/.test(pwd)
+    return hasLetter && hasNumber
+  }
+
   const validate = () => {
-    const newErrors: { email?: string; password?: string } = {}
+    const newErrors: { name?: string; email?: string; password?: string; confirmPassword?: string } = {}
+    
+    if (!name.trim()) {
+      newErrors.name = 'Name is required'
+    }
+    
     if (!email) {
       newErrors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(email)) {
       newErrors.email = 'Email is invalid'
     }
+    
     if (!password) {
       newErrors.password = 'Password is required'
-    } else if (password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters'
+    } else if (!validatePassword(password)) {
+      newErrors.password = 'Password must be at least 8 characters with at least one letter and one number'
     }
+    
+    if (!confirmPassword) {
+      newErrors.confirmPassword = 'Please confirm your password'
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match'
+    }
+    
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -38,17 +61,17 @@ const Signup = () => {
     setLoading(true)
     try {
       // Sign up directly (don't use signup function to avoid auto-navigation)
-      await api.post('/api/auth/signup', { email, password })
+      await api.post('/auth/signup', { email, password })
       
       // Login to get token
-      const loginResponse = await api.post<{ access_token: string }>('/api/auth/login', { email, password })
+      const loginResponse = await api.post<{ access_token: string }>('/auth/login', { email, password })
       localStorage.setItem('token', loginResponse.data.access_token)
       
       // If plan is selected, create checkout session
       if (plan && (plan === 'standard' || plan === 'pro')) {
         try {
           const interval = billing === 'yearly' ? 'year' : 'month'
-          const response = await api.post<{ checkout_url: string }>('/api/billing/create-checkout', {
+          const response = await api.post<{ checkout_url: string }>('/billing/create-checkout', {
             plan,
             interval,
           })
@@ -77,29 +100,48 @@ const Signup = () => {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout variant="signup">
       <div className="mb-6 flex items-center justify-end">
-        <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">
-          Login
+        <Link to="/login" className="text-sm text-muted-foreground transition-colors hover:text-primary">
+          Already have an account? <span className="font-semibold">Login</span>
         </Link>
       </div>
 
       <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-bold">Create an account</h1>
-        <p className="text-muted-foreground">Enter your email below to create your account</p>
+        <div className="mb-3 flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+            Create your account
+          </h1>
+        </div>
+        <p className="text-muted-foreground">
+          Join thousands of professionals optimizing their email communications
+        </p>
       </div>
 
       {plan && (
-        <div className="mb-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm">
-          Selected Plan: <span className="font-semibold">
+        <div className="mb-4 rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 to-purple-500/10 p-3 text-sm">
+          <span className="font-medium">Selected Plan: </span>
+          <span className="font-semibold text-primary">
             {plan === 'pro' 
-              ? `Pro (${billing === 'yearly' ? '$479.90/year' : '$49.99/month'})` 
+              ? `Professional (${billing === 'yearly' ? '$479.90/year' : '$49.99/month'})` 
               : `Standard (${billing === 'yearly' ? '$143.90/year' : '$14.99/month'})`}
           </span>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <Input
+            type="text"
+            placeholder="Full Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className={errors.name ? 'border-destructive' : ''}
+          />
+          {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
+        </div>
+
         <div>
           <Input
             type="email"
@@ -119,11 +161,26 @@ const Signup = () => {
             onChange={(e) => setPassword(e.target.value)}
             className={errors.password ? 'border-destructive' : ''}
           />
+          {password && <PasswordRequirements password={password} />}
           {errors.password && <p className="mt-1 text-sm text-destructive">{errors.password}</p>}
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Creating account...' : plan ? 'Sign Up & Continue to Payment' : 'Sign Up'}
+        <div>
+          <Input
+            type="password"
+            placeholder="Confirm Password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className={errors.confirmPassword ? 'border-destructive' : ''}
+          />
+          {errors.confirmPassword && <p className="mt-1 text-sm text-destructive">{errors.confirmPassword}</p>}
+          {confirmPassword && password && confirmPassword === password && (
+            <p className="mt-1 text-sm text-green-600 dark:text-green-400">✓ Passwords match</p>
+          )}
+        </div>
+
+        <Button type="submit" className="w-full bg-gradient-to-r from-primary to-purple-600 transition-all hover:scale-[1.02] hover:shadow-lg" disabled={loading}>
+          {loading ? 'Creating account...' : plan ? 'Get Started & Continue to Payment' : 'Create Account'}
         </Button>
       </form>
 

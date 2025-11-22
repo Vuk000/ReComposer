@@ -1,16 +1,27 @@
-import { useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useSearchParams, Link } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import Chart from '@/components/ui/Chart'
-import Calendar from '@/components/ui/Calendar'
-import Tooltip from '@/components/ui/Tooltip'
+import Button from '@/components/ui/Button'
 import Progress from '@/components/ui/Progress'
+import Badge from '@/components/ui/Badge'
 import { useToast } from '@/contexts/ToastContext'
-import { TrendingUp, TrendingDown, Users, DollarSign, HelpCircle, BarChart3 } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
+import { useRewrite } from '@/hooks/useRewrite'
+import { useStatus } from '@/hooks/useStatus'
+import api from '@/lib/api'
+import { Mail, Zap, Send, Clock, ArrowRight, Sparkles, FileText, AlertCircle } from 'lucide-react'
+import { RewriteLog } from '@/types/api'
 
 const Dashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams()
   const { showToast } = useToast()
+  const { user } = useAuth()
+  const { getUsage } = useRewrite()
+  const { status } = useStatus()
+  const [rewritesUsed, setRewritesUsed] = useState(0)
+  const [rewriteLimit, setRewriteLimit] = useState(50)
+  const [recentRewrites, setRecentRewrites] = useState<RewriteLog[]>([])
+  const [loadingUsage, setLoadingUsage] = useState(true)
 
   useEffect(() => {
     // Handle checkout success redirect
@@ -23,208 +34,287 @@ const Dashboard = () => {
       })
     }
   }, [searchParams, setSearchParams, showToast])
-  const revenueData = [
-    { value: 1200 },
-    { value: 1900 },
-    { value: 1500 },
-    { value: 2100 },
-    { value: 1800 },
-    { value: 2500 },
-    { value: 2200 },
-  ]
 
-  const activityData = [
-    { value: 45 },
-    { value: 52 },
-    { value: 48 },
-    { value: 61 },
-    { value: 55 },
-    { value: 58 },
-    { value: 62 },
-  ]
+  useEffect(() => {
+    // Fetch usage stats
+    const fetchUsage = async () => {
+      setLoadingUsage(true)
+      try {
+        const usage = await getUsage()
+        if (usage) {
+          setRewritesUsed(usage.used)
+          setRewriteLimit(usage.limit)
+        } else {
+          // Fallback based on plan
+          if (user?.subscription_plan === 'pro') {
+            setRewriteLimit(999999) // Unlimited for pro
+          } else {
+            setRewriteLimit(50) // Standard limit
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch usage:', error)
+        // Fallback based on plan
+        if (user?.subscription_plan === 'pro') {
+          setRewriteLimit(999999)
+        } else {
+          setRewriteLimit(50)
+        }
+      } finally {
+        setLoadingUsage(false)
+      }
+    }
 
-  const stats = [
-    {
-      title: 'Total Revenue',
-      value: '$1,250.00',
-      change: '+12.5%',
-      trend: 'up',
-      description: 'Visitors for the last 6 months',
-      icon: DollarSign,
-      tooltip: 'Total revenue generated from all sources',
-    },
-    {
-      title: 'New Customers',
-      value: '1,234',
-      change: '-20%',
-      trend: 'down',
-      description: 'Acquisition needs attention',
-      icon: Users,
-      tooltip: 'New customers acquired this period',
-    },
-    {
-      title: 'Active Accounts',
-      value: '45,678',
-      change: '+12.5%',
-      trend: 'up',
-      description: 'Engagement exceed targets',
-      icon: Users,
-      tooltip: 'Currently active user accounts',
-    },
-    {
-      title: 'Growth Rate',
-      value: '4.5%',
-      change: '+4.5%',
-      trend: 'up',
-      description: 'Meets growth projections',
-      icon: TrendingUp,
-      tooltip: 'Overall growth rate percentage',
-    },
-  ]
+    // Fetch recent rewrites
+    const fetchRecentRewrites = async () => {
+      try {
+        const response = await api.get<{ logs: RewriteLog[]; total: number; limit: number; offset: number }>('/api/rewrite/logs?limit=5')
+        if (response.data.logs) {
+          setRecentRewrites(response.data.logs)
+        }
+      } catch (error) {
+        console.error('Failed to fetch recent rewrites:', error)
+        // Silently fail - not critical
+      }
+    }
+
+    if (user) {
+      fetchUsage()
+      fetchRecentRewrites()
+    }
+  }, [user, getUsage])
+  const isPro = user?.subscription_plan === 'pro'
+  const usagePercentage = isPro ? 0 : (rewritesUsed / rewriteLimit) * 100
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">Welcome back! Here's what's happening with your account.</p>
+        <h1 className="text-3xl font-bold">Welcome back{user?.email ? `, ${user.email.split('@')[0]}` : ''}!</h1>
+        <p className="text-muted-foreground">Start optimizing your emails with AI-powered rewriting</p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.title} className="transition-all hover:border-primary/50">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-                <div className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-muted-foreground" />
-                  <Tooltip content={stat.tooltip}>
-                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+      {/* Status Alerts */}
+      {status && !status.rewrite_available && (
+        <Card className="border-orange-500/50 bg-orange-500/10">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-orange-600 dark:text-orange-400">AI Provider Not Configured</p>
+                <p className="text-sm text-orange-600/80 dark:text-orange-400/80 mt-1">
+                  Email rewriting is currently unavailable. Please configure OPENAI_API_KEY or ANTHROPIC_API_KEY in the backend environment.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* Rewrite Email */}
+        <Link to="/app/rewrite">
+          <Card className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-primary hover:shadow-xl hover:shadow-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-purple-600 transition-transform group-hover:scale-110">
+                  <Sparkles className="h-6 w-6 text-white" />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <div className="flex items-center gap-2 text-xs">
-                  {stat.trend === 'up' ? (
-                    <TrendingUp className="h-3 w-3 text-chart-1" />
-                  ) : (
-                    <TrendingDown className="h-3 w-3 text-destructive" />
-                  )}
-                  <span className={stat.trend === 'up' ? 'text-chart-1' : 'text-destructive'}>
-                    {stat.change}
-                  </span>
-                  <span className="text-muted-foreground">this period</span>
+                <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <h3 className="text-xl font-bold">Rewrite Email</h3>
+              <p className="text-sm text-muted-foreground">Transform your emails with AI</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Campaigns */}
+        <Link to="/app/campaigns">
+          <Card className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-primary hover:shadow-xl hover:shadow-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 transition-transform group-hover:scale-110">
+                  <Send className="h-6 w-6 text-white" />
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{stat.description}</p>
-              </CardContent>
-            </Card>
-          )
-        })}
+                <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <h3 className="text-xl font-bold">Campaigns</h3>
+              <p className="text-sm text-muted-foreground">
+                {isPro ? 'Manage email campaigns' : 'Pro feature - Upgrade to access'}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* Settings */}
+        <Link to="/app/settings">
+          <Card className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-primary hover:shadow-xl hover:shadow-primary/20">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 transition-transform group-hover:scale-110">
+                  <FileText className="h-6 w-6 text-white" />
+                </div>
+                <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <h3 className="text-xl font-bold">Settings</h3>
+              <p className="text-sm text-muted-foreground">Manage your account</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
-      {/* Charts and Calendar Row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Revenue Chart */}
-        <Card className="lg:col-span-2">
+      {/* Usage Stats */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Usage Card */}
+        <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>Total Revenue</CardTitle>
-                <CardDescription>Revenue trends over the last 7 days</CardDescription>
+                <CardTitle>Monthly Usage</CardTitle>
+                <CardDescription>
+                  {isPro ? 'Unlimited rewrites' : `${rewritesUsed} of ${rewriteLimit} rewrites used`}
+                </CardDescription>
               </div>
-              <select className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                <option>Last 7 days</option>
-                <option>Last 30 days</option>
-                <option>Last 3 months</option>
-              </select>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                <Zap className="h-6 w-6 text-primary" />
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Chart data={revenueData} type="line" height={200} />
-          </CardContent>
-        </Card>
-
-        {/* Calendar Widget */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Calendar</CardTitle>
-            <CardDescription>Select a date to view activity</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Calendar />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity and Progress Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Activity Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Activity</CardTitle>
-            <CardDescription>Your activity levels over the past week</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Chart data={activityData} type="bar" height={200} />
-          </CardContent>
-        </Card>
-
-        {/* Progress Goals */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Goals</CardTitle>
-            <CardDescription>Track your progress towards monthly targets</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span>Email Rewrites</span>
-                <span className="font-medium">850 / 1,000</span>
+            {loadingUsage ? (
+              <div className="text-center py-4 text-sm text-muted-foreground">Loading usage...</div>
+            ) : !isPro ? (
+              <>
+                <div className="mb-2 flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Used today</span>
+                  <span className="font-semibold">{rewritesUsed} / {rewriteLimit}</span>
+                </div>
+                <Progress value={usagePercentage} showLabel />
+                {usagePercentage > 80 && (
+                  <div className="rounded-lg bg-orange-500/10 p-3 text-sm text-orange-600 dark:text-orange-400">
+                    You're running low on rewrites. Consider upgrading to Pro for unlimited access.
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="rounded-lg bg-primary/10 p-4 text-center">
+                <p className="text-sm font-medium text-primary">Unlimited rewrites available</p>
+                <p className="mt-1 text-xs text-muted-foreground">Professional plan active</p>
               </div>
-              <Progress value={85} showLabel />
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span>Campaigns Sent</span>
-                <span className="font-medium">12 / 20</span>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Plan Info */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Current Plan</CardTitle>
+                <CardDescription>
+                  {isPro ? 'Professional' : 'Standard'} Plan
+                </CardDescription>
               </div>
-              <Progress value={60} showLabel />
-            </div>
-            <div>
-              <div className="mb-2 flex items-center justify-between text-sm">
-                <span>Response Rate</span>
-                <span className="font-medium">8.5%</span>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500/10">
+                <Mail className="h-6 w-6 text-purple-500" />
               </div>
-              <Progress value={85} showLabel />
             </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Email Rewrites</span>
+                <span className="font-medium">{isPro ? 'Unlimited' : '50/day'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Tone Options</span>
+                <span className="font-medium">All Available</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Email Campaigns</span>
+                <span className="font-medium">{isPro ? 'Included' : 'Not Available'}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">AI Generation</span>
+                <span className="font-medium">{isPro ? 'Included' : 'Not Available'}</span>
+              </div>
+            </div>
+            {!isPro && (
+              <Link to="/app/settings">
+                <Button className="w-full" variant="outline">
+                  Upgrade to Pro
+                </Button>
+              </Link>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Total Visitors Chart */}
+      {/* Recent Activity */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Total Visitors</CardTitle>
-              <CardDescription>Total for the last 3 months</CardDescription>
+              <CardTitle>Recent Activity</CardTitle>
+              <CardDescription>Your latest email rewrites</CardDescription>
             </div>
-            <select className="rounded-lg border border-border bg-background px-3 py-2 text-sm">
-              <option>Last 3 months</option>
-              <option>Last 6 months</option>
-              <option>Last year</option>
-            </select>
+            <Clock className="h-5 w-5 text-muted-foreground" />
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex h-[300px] items-center justify-center text-muted-foreground">
-            <div className="text-center">
-              <BarChart3 className="mx-auto mb-2 h-12 w-12 text-muted-foreground/50" />
-              <p>Detailed analytics coming soon</p>
+          {recentRewrites.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+              <Mail className="mb-4 h-12 w-12 text-muted-foreground/50" />
+              <p className="text-lg font-medium">No activity yet</p>
+              <p className="mt-1 text-sm">Start by rewriting your first email!</p>
+              <Link to="/app/rewrite">
+                <Button className="mt-4">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Rewrite Email
+                </Button>
+              </Link>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-4">
+              {recentRewrites.map((rewrite) => (
+                <div key={rewrite.id} className="rounded-lg border border-border/50 bg-card/30 p-4 transition-all hover:border-primary/30 hover:bg-card/50">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant="outline" className="text-xs">
+                          {rewrite.tone.charAt(0).toUpperCase() + rewrite.tone.slice(1)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(rewrite.created_at).toLocaleDateString()} at {new Date(rewrite.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        <span className="font-medium">Original:</span> {rewrite.original_email.substring(0, 100)}
+                        {rewrite.original_email.length > 100 && '...'}
+                      </p>
+                      <p className="text-sm mt-2 line-clamp-2">
+                        <span className="font-medium text-primary">Rewritten:</span> {rewrite.rewritten_email.substring(0, 100)}
+                        {rewrite.rewritten_email.length > 100 && '...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <Link to="/app/rewrite">
+                <Button variant="outline" className="w-full mt-4">
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  Rewrite Another Email
+                </Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

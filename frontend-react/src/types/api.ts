@@ -96,3 +96,13 @@ export interface BillingStatus {
   stripe_subscription_id?: string
 }
 
+export interface RewriteLog {
+  id: number
+  original_email: string
+  rewritten_email: string
+  tone: string
+  word_count: number
+  token_used: number
+  created_at: string
+}
+

@@ -180,10 +180,12 @@ async def check_daily_usage_limit(user: User, db: AsyncSession) -> tuple[int, in
     daily_limit = await get_daily_limit_for_user(user)
     
     # Calculate start of current UTC day (midnight UTC)
+    # Use timezone-aware datetime
     now = datetime.now(timezone.utc)
-    start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_of_day = datetime(now.year, now.month, now.day, 0, 0, 0, 0, timezone.utc)
     
     # Count rewrites since start of current UTC day
+    # Ensure both sides of comparison are timezone-aware by using func.timezone if needed
     count_result = await db.execute(
         select(func.count(RewriteLog.id))
         .where(RewriteLog.user_id == user.id)

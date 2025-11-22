@@ -10,7 +10,7 @@ export const useAuth = () => {
 
   const fetchUser = useCallback(async () => {
     try {
-      const response = await api.get<User>('/api/auth/me')
+      const response = await api.get<User>('/auth/me')
       setUser(response.data)
     } catch (error) {
       localStorage.removeItem('token')
@@ -31,12 +31,12 @@ export const useAuth = () => {
 
 
   const signup = async (email: string, password: string) => {
-    await api.post('/api/auth/signup', { email, password })
+    await api.post('/auth/signup', { email, password })
     return login(email, password)
   }
 
   const login = async (email: string, password: string) => {
-    const response = await api.post<AuthResponse>('/api/auth/login', { email, password })
+    const response = await api.post<AuthResponse>('/auth/login', { email, password })
     localStorage.setItem('token', response.data.access_token)
     await fetchUser()
     navigate('/app/dashboard')

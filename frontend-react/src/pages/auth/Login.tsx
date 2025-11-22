@@ -9,6 +9,7 @@ import { Github, Lock } from 'lucide-react'
 const Login = () => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const { login } = useAuth()
 
@@ -37,16 +38,16 @@ const Login = () => {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout variant="login">
       <div className="mb-6 flex items-center justify-end">
-        <Link to="/signup" className="text-sm text-muted-foreground hover:text-foreground">
-          Sign up
+        <Link to="/signup" className="text-sm text-muted-foreground transition-colors hover:text-primary">
+          Don't have an account? <span className="font-semibold">Sign up</span>
         </Link>
       </div>
 
       <div className="mb-8">
-        <h1 className="mb-2 text-3xl font-bold">Login</h1>
-        <p className="text-muted-foreground">Enter your email below to login to your account</p>
+        <h1 className="mb-2 text-3xl font-bold">Welcome back</h1>
+        <p className="text-muted-foreground">Sign in to continue to your account</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -72,14 +73,28 @@ const Login = () => {
           {errors.password && <p className="mt-1 text-sm text-destructive">{errors.password}</p>}
         </div>
 
-        <div className="flex items-center justify-end">
-          <Link to="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground">
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-border bg-background text-primary focus:ring-2 focus:ring-primary focus:ring-offset-2 cursor-pointer"
+            />
+            <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+              Remember me
+            </span>
+          </label>
+          <Link 
+            to="/forgot-password" 
+            className="text-sm font-medium text-primary hover:underline transition-all"
+          >
             Forgot password?
           </Link>
         </div>
 
-        <Button type="submit" className="w-full">
-          Sign In with Email
+        <Button type="submit" className="w-full transition-all hover:scale-[1.02]">
+          Sign In
         </Button>
       </form>
 

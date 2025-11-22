@@ -31,10 +31,17 @@ export const useSettings = () => {
       const response = await api.get<BillingStatus>('/api/billing/status')
       setBilling(response.data)
     } catch (err) {
-      // Show error but use fallback
+      // Handle billing disabled or other errors gracefully
       const error = err as AxiosErrorResponse
-      console.error('Failed to fetch billing status:', error.response?.data?.detail || error.message)
-      setBilling({ plan: 'standard', status: 'active' })
+      if (error.response?.status === 503 || error.response?.data?.detail?.includes('disabled')) {
+        // Billing is disabled - use user's plan from user object as fallback
+        console.warn('Billing endpoints disabled, using fallback plan')
+        setBilling(null) // Will be handled by Settings component
+      } else {
+        console.error('Failed to fetch billing status:', error.response?.data?.detail || error.message)
+        // Use fallback for other errors
+        setBilling({ plan: 'standard', status: 'active' })
+      }
     }
   }
 

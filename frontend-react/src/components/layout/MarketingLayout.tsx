@@ -16,11 +16,11 @@ const MarketingLayout = ({ children }: MarketingLayoutProps) => {
         
         <div className="container relative mx-auto flex h-20 items-center justify-between px-6">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 transition-transform hover:scale-105">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-purple-600 shadow-lg shadow-primary/25">
+          <Link to="/" className="group flex items-center gap-3 transition-transform duration-300 hover:scale-105">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-purple-600 shadow-lg shadow-primary/25 transition-all duration-300 group-hover:shadow-primary/50 group-hover:rotate-6">
               <span className="text-lg font-bold text-white">R</span>
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
+            <span className="text-xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent transition-all duration-300 group-hover:from-primary group-hover:to-purple-500">
               ReCompose
             </span>
           </Link>
@@ -29,25 +29,25 @@ const MarketingLayout = ({ children }: MarketingLayoutProps) => {
           <div className="hidden md:flex items-center gap-2">
             <a 
               href="#features" 
-              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
+              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
             >
               Features
             </a>
             <a 
               href="#pricing" 
-              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
+              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
             >
               Pricing
             </a>
             <a 
               href="#how-it-works" 
-              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
+              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
             >
               How It Works
             </a>
             <a 
               href="#faq" 
-              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
+              className="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-300 transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:text-white hover:shadow-lg hover:shadow-primary/20"
             >
               FAQ
             </a>
@@ -56,13 +56,13 @@ const MarketingLayout = ({ children }: MarketingLayoutProps) => {
           {/* CTA Buttons */}
           <div className="flex items-center gap-3">
             <Link to="/login" className="hidden sm:block">
-              <Button variant="ghost" className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20">
+              <Button variant="ghost" className="rounded-xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-white/10 hover:border-white/20">
                 Sign In
               </Button>
             </Link>
             <Link to="/signup">
-              <Button className="rounded-xl bg-gradient-to-r from-primary to-purple-600 shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:scale-105">
-                Start Free Trial
+              <Button className="rounded-xl bg-gradient-to-r from-primary to-purple-600 shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-105 hover:shadow-primary/40 hover:shadow-xl">
+                Get Started
               </Button>
             </Link>
           </div>
@@ -88,13 +88,13 @@ const MarketingLayout = ({ children }: MarketingLayoutProps) => {
               </p>
             </div>
             <div className="flex gap-8">
-              <Link to="#" className="text-sm text-slate-400 transition-colors hover:text-white">
+              <Link to="#" className="text-sm text-slate-400 transition-all duration-300 hover:scale-110 hover:text-primary">
                 Terms of Service
               </Link>
-              <Link to="#" className="text-sm text-slate-400 transition-colors hover:text-white">
+              <Link to="#" className="text-sm text-slate-400 transition-all duration-300 hover:scale-110 hover:text-primary">
                 Privacy Policy
               </Link>
-              <Link to="#" className="text-sm text-slate-400 transition-colors hover:text-white">
+              <Link to="#" className="text-sm text-slate-400 transition-all duration-300 hover:scale-110 hover:text-primary">
                 Documentation
               </Link>
             </div>

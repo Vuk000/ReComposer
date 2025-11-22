@@ -5,13 +5,16 @@ import Badge from '@/components/ui/Badge'
 import Input from '@/components/ui/Input'
 import { useSettings } from '@/hooks/useSettings'
 import { useAuth } from '@/hooks/useAuth'
+import { useStatus } from '@/hooks/useStatus'
 import { useToast } from '@/contexts/ToastContext'
 import api from '@/lib/api'
 import { AxiosErrorResponse } from '@/types/errors'
+import { AlertCircle } from 'lucide-react'
 
 const Settings = () => {
   const { user } = useAuth()
   const { settings, billing, updateSettings } = useSettings()
+  const { status } = useStatus()
   const { showToast } = useToast()
   const [defaultTone, setDefaultTone] = useState(settings?.default_tone || 'professional')
   const [styleLearning, setStyleLearning] = useState(settings?.style_learning_enabled || false)
@@ -37,7 +40,14 @@ const Settings = () => {
       window.location.href = response.data.checkout_url
     } catch (err) {
       const error = err as AxiosErrorResponse
-      showToast(error.response?.data?.detail || 'Failed to create checkout session', 'error')
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create checkout session'
+      
+      // Check if billing is disabled
+      if (error.response?.status === 503 || errorMessage.includes('disabled')) {
+        showToast('Billing is currently disabled. Please contact support to manage your subscription.', 'error')
+      } else {
+        showToast(errorMessage, 'error')
+      }
     }
   }
 
@@ -47,7 +57,14 @@ const Settings = () => {
       window.location.href = response.data.portal_url
     } catch (err) {
       const error = err as AxiosErrorResponse
-      showToast(error.response?.data?.detail || 'Failed to open billing portal', 'error')
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to open billing portal'
+      
+      // Check if billing is disabled
+      if (error.response?.status === 503 || errorMessage.includes('disabled')) {
+        showToast('Billing is currently disabled. Please contact support to manage your subscription.', 'error')
+      } else {
+        showToast(errorMessage, 'error')
+      }
     }
   }
 
@@ -88,9 +105,26 @@ const Settings = () => {
           <CardDescription>Manage your subscription and billing</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
+          {status && !status.billing_available && (
+            <div className="rounded-lg border border-orange-500/50 bg-orange-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-orange-600 dark:text-orange-400">Billing Not Configured</p>
+                  <p className="text-sm text-orange-600/80 dark:text-orange-400/80 mt-1">
+                    {!status.billing_enabled 
+                      ? 'Billing is disabled. Set BILLING_ENABLED=true in the backend environment to enable.'
+                      : !status.stripe_configured
+                      ? 'Stripe is not configured. Set STRIPE_SECRET_KEY in the backend environment to enable billing.'
+                      : 'Billing is not available at this time.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-4">
             <Button variant="outline" onClick={handleChangePlan}>
-              Change Plan
+              {user?.subscription_plan === 'pro' ? 'Downgrade to Standard' : 'Upgrade to Pro'}
             </Button>
             <Button variant="outline" onClick={handleManageBilling}>
               Manage Billing
@@ -105,6 +139,12 @@ const Settings = () => {
               ? 'Your subscription is past due'
               : 'Subscription status unknown'}
           </p>
+          {billing && (
+            <div className="rounded-lg border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground">
+              <p className="font-medium mb-1">Note:</p>
+              <p>If billing features are unavailable, please contact support for subscription management.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

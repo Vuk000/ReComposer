@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, AlertCircle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Textarea from '@/components/ui/Textarea'
 import { useRewrite } from '@/hooks/useRewrite'
+import { useStatus } from '@/hooks/useStatus'
 import { useToast } from '@/contexts/ToastContext'
 
 const Rewrite = () => {
@@ -12,6 +13,7 @@ const Rewrite = () => {
   const [selectedTone, setSelectedTone] = useState<'professional' | 'friendly' | 'persuasive'>('professional')
   const [copied, setCopied] = useState(false)
   const { rewriteEmail, loading, error } = useRewrite()
+  const { status } = useStatus()
   const { showToast } = useToast()
 
   const tones = [
@@ -71,6 +73,22 @@ const Rewrite = () => {
         <h1 className="text-3xl font-bold">Email Rewriter</h1>
         <p className="text-muted-foreground">Transform your emails with AI-powered rewriting</p>
       </div>
+
+      {status && !status.rewrite_available && (
+        <Card className="border-orange-500/50 bg-orange-500/10">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-orange-600 dark:text-orange-400">AI Provider Not Configured</p>
+                <p className="text-sm text-orange-600/80 dark:text-orange-400/80 mt-1">
+                  Email rewriting is currently unavailable. Please configure OPENAI_API_KEY or ANTHROPIC_API_KEY in the backend environment.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {tones.map((tone) => (
